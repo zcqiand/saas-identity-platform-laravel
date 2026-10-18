@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "suite_version": "0.6.0",
+  "project": "saas-identity-platform-laravel",
+  "stack": "laravel",
+  "gates": {
+    "L1": {
+      "name": "格式（Pint）",
+      "cmd": [
+        "php",
+        "vendor/laravel/pint/builds/pint",
+        "--test"
+      ],
+      "fix": "先确认 composer install 已跑（vendor/ 在）。运行 php vendor/laravel/pint/builds/pint 后重试；格式抖动说明编辑器插件与仓内 Pint 版本不一致，以仓为准。"
+    },
+    "L2": {
+      "name": "静态检查（Larastan）",
+      "cmd": [
+        "php",
+        "vendor/phpstan/phpstan/phpstan",
+        "analyse"
+      ],
+      "fix": "先确认 composer install 已跑。逐条修复 phpstan 报告；基线不收紧不放松，规则误伤在 phpstan.neon 加定向 ignore 并写理由，禁改门定义。"
+    },
+    "L4": {
+      "name": "测试",
+      "cmd": [
+        "php",
+        "vendor/phpunit/phpunit/phpunit"
+      ],
+      "fix": "先确认 composer install 已跑，再让测试变绿。"
+    }
+  },
+  "trace_cmd": [
+    "php",
+    "vendor/phpunit/phpunit/phpunit"
+  ],
+  "trace_env": {
+    "TRACE_MAP": "1"
+  },
+  "source_dirs": [
+    "app",
+    "routes",
+    "bootstrap",
+    "config",
+    "database"
+  ],
+  "test_dirs": [
+    "tests"
+  ]
+}

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+            <directory>routes</directory>
+        </include>
+    </source>
+    <php>
+        <!-- 测试期固定环境（Laravel 12 stock 同款）：DB 用 sqlite :memory:（骨架无 DB 触碰，
+             spec §4.7-2 裁定），探活路由不挂 web 中间件组故无 session/cookie，无 APP_KEY 依赖 -->
+        <env name="APP_ENV" value="testing"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+    </php>
+    <extensions>
+        <!-- trace 适配器：仅 TRACE_MAP=1（suite trace_env 注入）时写 .state/trace.json -->
+        <bootstrap class="Harness\HarnessTraceExtension"/>
+    </extensions>
+</phpunit>

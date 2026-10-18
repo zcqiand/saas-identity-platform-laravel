@@ -1,0 +1,17 @@
+/vendor/
+/node_modules/
+/.env
+/.env.*
+!/.env.example
+/.phpunit.cache
+/.phpunit.result.cache
+/.state/trace.json
+/.state/gate.json
+/.state/gate.partial.json
+/.state/alignment.json
+/.state/tree-change.json
+/storage/*.key
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
