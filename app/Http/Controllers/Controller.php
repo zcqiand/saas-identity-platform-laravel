@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\InvalidCredentials;
+use App\Services\Auth\JwtService;
 use App\Support\Camel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -72,6 +74,33 @@ abstract class Controller
             'page_size' => $pageSize,
             'total' => $total,
         ]);
+    }
+
+    /**
+     * oauth 链手动 decode（rails ApplicationController#decode_bearer! 镜像：springboot
+     * SecurityConfig 独立 permitAll 链——oauth 控制器不挂 TenantGuard（public 链），
+     * decode 语义放基座与 rails 同位）：无/坏 Bearer、验签失败、无 tenant_id claim
+     * → InvalidCredentials（基座映射 401 INVALID_CREDENTIALS）。
+     *
+     * @return array<string, mixed> JWT payload（sub / tenant_id / ...）
+     */
+    protected function decodeBearer(Request $request): array
+    {
+        $header = (string) $request->headers->get('Authorization', '');
+        $token = str_starts_with($header, 'Bearer ') ? trim(substr($header, 7)) : $header;
+        if ($token === '' || $token === $header) {
+            throw new InvalidCredentials('missing bearer token');
+        }
+
+        // TokenExpired/TokenInvalid 不在此吞——基座映射表直接转 401（rails rescue JWT::* 同形）
+        $payload = (new JwtService)->verify($token);
+
+        $tenantId = $payload['tenant_id'] ?? null;
+        if (! is_string($tenantId) || $tenantId === '') {
+            throw new InvalidCredentials('missing tenant_id claim');
+        }
+
+        return $payload;
     }
 
     /**

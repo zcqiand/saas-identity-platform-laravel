@@ -16,6 +16,8 @@ use Illuminate\Support\Carbon;
  * @property string $client_id
  * @property string|null $user_id
  * @property string|null $tenant_id
+ * @property string|null $scope
+ * @property string $token_type
  * @property Carbon $expires_at
  * @property bool $revoked
  * @property Carbon $created_at
