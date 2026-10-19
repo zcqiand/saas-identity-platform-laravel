@@ -35,6 +35,13 @@ final class JwtService
         $this->ttl = (int) $ttl;
     }
 
+    // TTL 读取（login payload expires_in 用；rails ENV.fetch('JWT_TTL_SECONDS').to_i 同源，
+    // 构造期已 fail-fast 校验，取值即合法）
+    public function ttl(): int
+    {
+        return $this->ttl;
+    }
+
     /**
      * 按家族 payload 形状签发 HS256 token（claims 含 sub/tenant_id，iat/exp 自动补）。
      *

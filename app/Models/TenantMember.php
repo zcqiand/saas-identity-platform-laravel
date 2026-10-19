@@ -9,7 +9,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $user_id
+ * @property string|null $member_name
+ * @property bool $is_owner
+ * @property int $status
+ * @property Carbon $created_at
+ */
 class TenantMember extends Generated\TenantMember
 {
     public function tenant(): BelongsTo

@@ -17,6 +17,11 @@ return [
             'password' => env('PG_PASSWORD'),
             'charset' => 'utf8',
             'prefix' => '',
+            // 会话时区钉 UTC（rails ActiveRecord 默认 SET timezone=UTC 同源语义）：
+            // timestamptz 列（locked_until 等）Laravel 以 naive UTC 字符串写入、PG 按
+            // 会话时区解读——不钉时区时落在服务器本地 +08，绝对时刻漂 8 小时
+            // （locked_until->isFuture() 恒 false，锁 15 分钟形同虚设，实测指纹）。
+            'timezone' => 'UTC',
             'search_path' => 'public',
             'sslmode' => 'prefer',
         ],

@@ -8,9 +8,19 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
+ * @property string $id
+ * @property string $username
  * @property string $password
+ * @property string|null $email
+ * @property string|null $mobile
+ * @property int $status
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ * @property int $failed_attempts
+ * @property Carbon|null $locked_until
  */
 class SysUser extends Generated\SysUser
 {

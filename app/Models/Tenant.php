@@ -7,7 +7,16 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $tenant_key
+ * @property string $name
+ * @property int $status
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ */
 class Tenant extends Generated\Tenant
 {
     /** status 枚举（rails Tenant 同源）：1=active / 0=disabled。 */
