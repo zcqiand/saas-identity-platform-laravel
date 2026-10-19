@@ -8,6 +8,9 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <testsuite name="Contracts">
+            <directory>tests/Contracts</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
@@ -16,13 +19,13 @@
         </include>
     </source>
     <php>
-        <!-- 测试期固定环境（Laravel 12 stock 同款）：DB 用 sqlite :memory:（骨架无 DB 触碰，
-             spec §4.7-2 裁定），探活路由不挂 web 中间件组故无 session/cookie，无 APP_KEY 依赖 -->
-        <env name="APP_ENV" value="testing"/>
+        <!-- 测试期固定环境：DB 走 .env.test 的 PG 键（Laravel 按 APP_ENV 找 .env.<APP_ENV>，
+             故 APP_ENV=test ⇔ 加载 .env.test，与 L0.5 进仓契约文件名一致；rails rake test
+             同语义）。探活路由不挂 web 中间件组故无 session/cookie，无 APP_KEY 依赖；
+             parity/health/smoke 不碰库，Laravel 惰性连接 → 天然零 PG 依赖。 -->
+        <env name="APP_ENV" value="test"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
