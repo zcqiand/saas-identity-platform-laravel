@@ -1,0 +1,7 @@
+{
+  "db_synced_sha": "f2fcda8de8ca8686b9e7040b8571315e1cb3cfd1",
+  "db_synced_at": "2026-10-19T11:35:46.180707+00:00",
+  "db_synced_cmd": "scaffold-models.sh",
+  "shared_sha": "f2fcda8de8ca8686b9e7040b8571315e1cb3cfd1",
+  "consumer_repo": "saas-identity-platform-laravel"
+}
