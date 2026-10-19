@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property bool $is_owner
  * @property int $status
  * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class TenantMember extends Generated\TenantMember
 {

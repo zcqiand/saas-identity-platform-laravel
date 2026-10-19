@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Family;
 
 // 家族字典：smallint 枚举 ↔ API 字符串（rails app/services/family/dicts.rb 镜像，
-// 镜像 springboot 各 assembler 的映射分支）。本任务先落 memberStatus（login.availableTenants
-// 消费）；其余字典随对应 tag 任务按需补齐。
+// 镜像 springboot 各 assembler 的映射分支）。
 final class Dicts
 {
     // tenant_member.status：1=active 2=invited 3=suspended 其余/null=disabled
@@ -16,6 +15,28 @@ final class Dicts
             1 => 'active',
             2 => 'invited',
             3 => 'suspended',
+            default => 'disabled',
+        };
+    }
+
+    // 反向字典（rails member_status_code 镜像）：未知字符串 → 0（成员 list status 过滤/
+    // status 端点消费；0 不匹配任何行）
+    public static function memberStatusCode(string $value): int
+    {
+        return match ($value) {
+            'active' => 1,
+            'invited' => 2,
+            'suspended' => 3,
+            default => 0,
+        };
+    }
+
+    // sys_user.status（invitations / members 视图）：无 suspended 档
+    public static function userStatus(int|string|null $value): string
+    {
+        return match ((int) $value) {
+            1 => 'active',
+            2 => 'invited',
             default => 'disabled',
         };
     }
