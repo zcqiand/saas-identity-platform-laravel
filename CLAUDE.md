@@ -12,7 +12,7 @@ SaaS 身份平台 Laravel 端（`saas-identity-platform-laravel`，技术栈 `la
 - **TDD**：每个模块先写失败测试 → 跑确认失败 → 实现 → 跑确认绿 → commit
 - **版本钉死**：依赖与 `version-lock.json` 的 `version_lock` 一致；不引入 lock 外的库
 - **tag 即放行**：全量回归绿后打 `v<MAJOR>.<MINOR>.<PATCH>-<YYYYMMDD>`（如 `v0.3.54-20260826`）
-- **mock-friendly**：安装 + 测试必须在无 Key、无 Docker、无网下全绿
+- **mock-friendly**：无外部服务/无网全绿；本机 PG（127.0.0.1:54321，裸装机非容器）属本机基础设施，真库链同 rails 三件套口径
 - **功能清单是锚点**：改 `docs/functions/function-tree.md` 走 `/tree-change` 提案，由人批准；
   改功能与改功能清单必须同一个 commit；废弃只改状态，编号永不复用；禁止给 skip 的测试挂功能 ID
 
