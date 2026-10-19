@@ -10,13 +10,19 @@ use Illuminate\Support\Env;
 final class TestJwt
 {
     /**
-     * 手工签 HS256（或其他 alg 供混淆用例）。
+     * 手工签 HS256（或其他 alg 供混淆用例）。默认并入 iss/aud 家族值（终审 I-2 同步
+     * ——JwtService verify 开 verify_iss/verify_aud 后坏形状测试须逐 claim 显式覆盖，
+     * 覆盖键优先；'iss' => null 即构造「缺 claim」形状）。
      *
      * @param  array<string, mixed>  $payload
      */
     public static function sign(array $payload, ?string $key = null, string $alg = 'HS256'): string
     {
         $key ??= (string) Env::get('JWT_SIGNING_KEY');
+        $payload = array_merge([
+            'iss' => (string) Env::get('JWT_ISSUER'),
+            'aud' => (string) Env::get('JWT_AUDIENCE'),
+        ], $payload);
         $head = self::b64((string) json_encode(['alg' => $alg, 'typ' => 'JWT'], JSON_UNESCAPED_SLASHES));
         $body = self::b64((string) json_encode($payload, JSON_UNESCAPED_SLASHES));
         $sig = self::b64(hash_hmac('sha256', $head.'.'.$body, $key, true));
@@ -24,7 +30,7 @@ final class TestJwt
         return $head.'.'.$body.'.'.$sig;
     }
 
-    // 家族 payload 形状：{sub, tenant_id, iat, exp}；过期 1 小时前签发。
+    // 家族 payload 形状：{sub, tenant_id, iss, aud, iat, exp}；过期 1 小时前签发。
     public static function expired(): string
     {
         return self::sign(['sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time() - 7200, 'exp' => time() - 3600]);

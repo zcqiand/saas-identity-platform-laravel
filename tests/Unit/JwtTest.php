@@ -135,6 +135,124 @@ final class JwtTest extends TestCase
         (new JwtService)->verify('not-a-jwt');
     }
 
+    // —— 终审 I-2：iss/aud 接入（rails Auth::JwtVerifier 镜像，推翻 T4 YAGNI 旧裁） ——
+
+    // rails encode 镜像：payload 恒带 iss/aud（家族值 rails .env.example:24-25）
+    #[Test]
+    public function encode_carries_issuer_and_audience_claims(): void
+    {
+        $payload = (new JwtService)->verify((new JwtService)->encode(['sub' => 'user-1', 'tenant_id' => 'tenant-1']));
+
+        $this->assertSame('saas-identity-platform', $payload['iss']);
+        $this->assertSame('saas-identity-platform-clients', $payload['aud']);
+    }
+
+    // rails verify_iss: true 镜像：iss 严格相等，不符 → TokenInvalid（调用方转 401）
+    #[Test]
+    public function wrong_issuer_is_rejected(): void
+    {
+        $this->expectException(TokenInvalid::class);
+
+        (new JwtService)->verify(TestJwt::sign([
+            'sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time(), 'exp' => time() + 3600,
+            'iss' => 'other-issuer',
+        ]));
+    }
+
+    // rails verify_aud: true 镜像：aud string 严格相等，不符 → TokenInvalid
+    #[Test]
+    public function wrong_audience_string_is_rejected(): void
+    {
+        $this->expectException(TokenInvalid::class);
+
+        (new JwtService)->verify(TestJwt::sign([
+            'sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time(), 'exp' => time() + 3600,
+            'aud' => 'other-audience',
+        ]));
+    }
+
+    // aud 数组含期望值即过（ruby-jwt Array wrap 语义镜像）
+    #[Test]
+    public function audience_array_containing_expected_passes(): void
+    {
+        $token = TestJwt::sign([
+            'sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time(), 'exp' => time() + 3600,
+            'aud' => ['other-audience', 'saas-identity-platform-clients'],
+        ]);
+
+        $payload = (new JwtService)->verify($token);
+
+        $this->assertSame('user-1', $payload['sub']);
+    }
+
+    #[Test]
+    public function audience_array_without_expected_is_rejected(): void
+    {
+        $this->expectException(TokenInvalid::class);
+
+        (new JwtService)->verify(TestJwt::sign([
+            'sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time(), 'exp' => time() + 3600,
+            'aud' => ['other-audience'],
+        ]));
+    }
+
+    // 缺 iss / aud → TokenInvalid（缺身份 claim 必 401，禁静默放行）
+    #[Test]
+    public function missing_issuer_is_rejected(): void
+    {
+        $this->expectException(TokenInvalid::class);
+
+        (new JwtService)->verify(TestJwt::sign([
+            'sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time(), 'exp' => time() + 3600,
+            'iss' => null,
+        ]));
+    }
+
+    #[Test]
+    public function missing_audience_is_rejected(): void
+    {
+        $this->expectException(TokenInvalid::class);
+
+        (new JwtService)->verify(TestJwt::sign([
+            'sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time(), 'exp' => time() + 3600,
+            'aud' => null,
+        ]));
+    }
+
+    #[Test]
+    public function missing_issuer_env_throws_fail_fast(): void
+    {
+        $saved = Env::get('JWT_ISSUER');
+        $this->removeEnv('JWT_ISSUER');
+        try {
+            new JwtService;
+            self::fail('缺 JWT_ISSUER 必须 throw（fail-fast，禁 env 默认值兜底——suite-hard-rules §1）');
+        } catch (AssertionFailedError $e) {
+            throw $e; // fail() 抛的 AssertionFailedError 是 RuntimeException 子类，先接住重抛防假绿
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('JWT_ISSUER', $e->getMessage());
+        } finally {
+            $this->restoreEnv('JWT_ISSUER', $saved);
+        }
+    }
+
+    #[Test]
+    public function missing_audience_env_throws_fail_fast(): void
+    {
+        $saved = Env::get('JWT_AUDIENCE');
+        $this->removeEnv('JWT_AUDIENCE');
+        try {
+            new JwtService;
+            self::fail('缺 JWT_AUDIENCE 必须 throw（fail-fast，禁 env 默认值兜底——suite-hard-rules §1）');
+        } catch (AssertionFailedError $e) {
+            throw $e; // 同上
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('JWT_AUDIENCE', $e->getMessage());
+        } finally {
+            $this->restoreEnv('JWT_AUDIENCE', $saved);
+        }
+    }
+
     // —— env 操盘助手：Laravel Env repository 直读超全局/live getenv，三处同撤同还 ——
 
     private function removeEnv(string $key): void

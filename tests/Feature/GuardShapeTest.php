@@ -91,6 +91,51 @@ final class GuardShapeTest extends TestCase
         $this->assertStringStartsWith('invalid token: ', $this->bodyOf($response)['message']);
     }
 
+    // ---- iss/aud 校验（终审 I-2：rails JwtVerifier verify_iss/verify_aud 镜像）——不符即
+    // TokenInvalid → 401 INVALID_CREDENTIALS，缺 claim 同罪（ADR-0019 禁静默放行） ----
+
+    #[Test]
+    public function wrong_issuer_token_is_401(): void
+    {
+        $token = TestJwt::sign([
+            'sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time(), 'exp' => time() + 3600,
+            'iss' => 'other-issuer',
+        ]);
+
+        $response = $this->runGuard($this->requestWithToken($token));
+
+        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame('INVALID_CREDENTIALS', $this->bodyOf($response)['code']);
+    }
+
+    #[Test]
+    public function wrong_audience_token_is_401(): void
+    {
+        $token = TestJwt::sign([
+            'sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time(), 'exp' => time() + 3600,
+            'aud' => 'other-audience',
+        ]);
+
+        $response = $this->runGuard($this->requestWithToken($token));
+
+        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame('INVALID_CREDENTIALS', $this->bodyOf($response)['code']);
+    }
+
+    #[Test]
+    public function token_without_issuer_claim_is_401(): void
+    {
+        $token = TestJwt::sign([
+            'sub' => 'user-1', 'tenant_id' => 'tenant-1', 'iat' => time(), 'exp' => time() + 3600,
+            'iss' => null,
+        ]);
+
+        $response = $this->runGuard($this->requestWithToken($token));
+
+        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame('INVALID_CREDENTIALS', $this->bodyOf($response)['code']);
+    }
+
     #[Test]
     public function valid_token_passes_through_and_exposes_identity_attributes(): void
     {
