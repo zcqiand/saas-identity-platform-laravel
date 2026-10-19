@@ -240,6 +240,18 @@ final class MeFlowTest extends TestCase
         self::assertSame('NOT_FOUND', $response->json('code'));
     }
 
+    // 终审 I-1：malformed tenantId → rails Tenant.find_by cast 吞错 → RecordNotFound
+    // → bad_uuid_param → 400 malformed uuid（me 链无 verify_path_tenant，甄别即门面）。
+    #[Test]
+    public function switch_with_malformed_tenant_id_is_400(): void
+    {
+        $response = $this->postJson('/api/v1/me/tenants/not-a-uuid/switch', [], $this->authHeader($this->token));
+
+        self::assertSame(400, $response->status(), $response->getContent());
+        self::assertSame('BAD_REQUEST', $response->json('code'));
+        self::assertStringStartsWith('malformed uuid', (string) $response->json('message'));
+    }
+
     // ---- 数据工厂（事务内，回滚不留痕） ----
 
     /** alice 首 active member 行（种子保证存在） */

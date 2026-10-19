@@ -77,11 +77,17 @@ final class TenantRoleMenusController extends Controller
         ]);
     }
 
-    // bulk 全删；roleId 不存在也 204（不预查，镜像）
+    // bulk 全删；roleId 不存在也 204（不预查，镜像）。格式非法 uuid 前置甄别（终审 I-1，
+    // deleteTenant 同款）：rails 直接 delete_all，AR cast 吞错 → 0 行 204，PG uuid 列直查
+    // 会 22P02 → 500 分叉；clear 无 404/400 面，甄别命中直接 204 不落查询
     // @impl M00.F04.I04 (book anchor xr-know-012)
     public function clearSysRoleMenus(Request $request): Response
     {
         TenantGuard::verifyPathTenant($request);
+
+        if (self::badUuidParam($request) !== null) {
+            return response()->noContent();
+        }
 
         SysRoleMenu::query()->where('role_id', (string) $request->route('roleId'))->delete();
 
@@ -90,9 +96,16 @@ final class TenantRoleMenusController extends Controller
 
     /**
      * rails #locate_role 镜像：查无或 tenant_id 不属本租户 → 404（不泄露跨租户存在性）。
+     * 先走基座 UUID 甄别再查询（终审 I-1）：rails AR cast 吞错 → find_by! 转
+     * RecordNotFound → 基座渲染映射 400 malformed uuid。
      */
     private function locateRole(Request $request): SysRole
     {
+        $bad = self::badUuidParam($request);
+        if ($bad !== null) {
+            throw (new ModelNotFoundException)->setModel(SysRole::class, [$bad]);
+        }
+
         $roleId = (string) $request->route('roleId');
         $role = SysRole::query()->where('id', $roleId)->first();
         if ($role === null || (string) $role->tenant_id !== (string) $request->route('tenantId')) {

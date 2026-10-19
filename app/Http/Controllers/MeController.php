@@ -74,6 +74,14 @@ final class MeController extends Controller
         $userId = (string) $request->attributes->get('currentUserId');
         $tenantId = (string) $request->route('tenantId');
 
+        // 基座 UUID 甄别（终审 I-1，findTenant 同款）：rails Tenant.find_by AR cast 吞错
+        // → RecordNotFound → bad_uuid_param → 400 malformed uuid；PG uuid 列直查会
+        // 22P02 → 500 分叉。me 链无 verify_path_tenant，甄别即门面。
+        $bad = self::badUuidParam($request);
+        if ($bad !== null) {
+            throw (new ModelNotFoundException)->setModel(Tenant::class, [$bad]);
+        }
+
         $tenant = Tenant::query()->where('id', $tenantId)->first();
         if ($tenant === null) {
             throw (new ModelNotFoundException)->setModel(Tenant::class, [$tenantId]);

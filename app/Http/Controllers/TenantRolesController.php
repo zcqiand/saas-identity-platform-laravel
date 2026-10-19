@@ -111,9 +111,17 @@ final class TenantRolesController extends Controller
 
     /**
      * rails #locate_role 镜像：查无或 tenant_id 不属本租户 → 404（不泄露跨租户存在性）。
+     * 先走基座 UUID 甄别再查询（终审 I-1，findTenant 同款）：PG uuid 列直吃非法串会
+     * 22P02 QueryException（500 分叉），rails AR cast 吞错 → find_by! 转 RecordNotFound
+     * → 基座渲染映射 400 malformed uuid。3 个带 {roleId} 的 op（含 delete）全经此入口。
      */
     private function locateRole(Request $request): SysRole
     {
+        $bad = self::badUuidParam($request);
+        if ($bad !== null) {
+            throw (new ModelNotFoundException)->setModel(SysRole::class, [$bad]);
+        }
+
         $roleId = (string) $request->route('roleId');
         $role = SysRole::query()->where('id', $roleId)->first();
         if ($role === null || (string) $role->tenant_id !== (string) $request->route('tenantId')) {

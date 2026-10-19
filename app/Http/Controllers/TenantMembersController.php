@@ -251,11 +251,20 @@ final class TenantMembersController extends Controller
     /**
      * rails #locate_member 镜像：(tenant_id, user_id) 解析 member 行，寻不到 404；
      * member 无对应 user 行也 404（'member user missing'）。
+     * 先走基座 UUID 甄别再查询（终审 I-1，findTenant 同款）：PG uuid 列直吃非法串会
+     * 22P02 QueryException（500 分叉），rails AR cast 吞错 → find_by! 转 RecordNotFound
+     * → 基座渲染映射 400 malformed uuid。5 个带 {userId} 的 op（含 delete）全经此入口
+     * ——delete_tenant_user 也先 locate_member，甄别命中 400 非 204。
      *
      * @return array{0: TenantMember, 1: SysUser}
      */
     private function locateMember(Request $request): array
     {
+        $bad = self::badUuidParam($request);
+        if ($bad !== null) {
+            throw (new ModelNotFoundException)->setModel(TenantMember::class, [$bad]);
+        }
+
         $userId = (string) $request->route('userId');
         $member = TenantMember::query()
             ->where('tenant_id', (string) $request->route('tenantId'))

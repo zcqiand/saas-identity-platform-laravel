@@ -708,6 +708,82 @@ final class TenantFlowTest extends TestCase
         self::assertSame(204, $unknown->status(), $unknown->getContent());
     }
 
+    // ---- malformed uuid 前置甄别（终审 I-1；rails bad_uuid_param 镜像） ----
+
+    // rails locate_member find_by!：AR uuid cast 吞错 → RecordNotFound → bad_uuid_param
+    // → 400 malformed uuid。5 个带 {userId} 的 op 全走 locate_member——含 delete
+    // （delete_tenant_user 先 locate_member 再删，甄别命中 400 非 204）。
+    #[Test]
+    public function member_ops_with_malformed_user_id_are_400(): void
+    {
+        $auth = $this->authHeader($this->token);
+        $base = "/api/v1/tenants/{$this->tenantId}/members/not-a-uuid";
+
+        $cases = [
+            'show' => $this->getJson($base, $auth),
+            'update' => $this->patchJson($base, ['email' => 'tf-malformed@x.io'], $auth),
+            'changeStatus' => $this->patchJson("{$base}/status", ['status' => 'active'], $auth),
+            'assignRoles' => $this->putJson("{$base}/roles", ['roleIds' => []], $auth),
+            'delete' => $this->deleteJson($base, [], $auth),
+        ];
+        foreach ($cases as $op => $response) {
+            self::assertSame(400, $response->status(), "[{$op}] ".$response->getContent());
+            self::assertSame('BAD_REQUEST', $response->json('code'), "[{$op}]");
+            self::assertStringStartsWith('malformed uuid', (string) $response->json('message'), "[{$op}]");
+        }
+    }
+
+    // {tenantId} malformed 不入 locate_member——verifyPathTenant 先拦：malformed ≠ JWT
+    // tenant_id claim → 403 FORBIDDEN（rails verify_path_tenant! before_action 同序）。
+    #[Test]
+    public function member_ops_with_malformed_tenant_id_are_403_tenant_mismatch(): void
+    {
+        $response = $this->getJson('/api/v1/tenants/not-a-uuid/members/not-a-uuid', $this->authHeader($this->token));
+
+        self::assertSame(403, $response->status(), $response->getContent());
+        self::assertSame('FORBIDDEN', $response->json('code'));
+    }
+
+    // rails locate_role find_by! → RecordNotFound → bad_uuid_param → 400；3 个带 {roleId}
+    // 的 op 全走 locate_role（含 delete——delete_sys_role 先 locate_role 再删）。
+    #[Test]
+    public function role_show_update_delete_with_malformed_role_id_are_400(): void
+    {
+        $auth = $this->authHeader($this->token);
+        $base = "/api/v1/tenants/{$this->tenantId}/roles/not-a-uuid";
+
+        $cases = [
+            'show' => $this->getJson($base, $auth),
+            'update' => $this->patchJson($base, ['roleName' => 'tf-malformed'], $auth),
+            'delete' => $this->deleteJson($base, [], $auth),
+        ];
+        foreach ($cases as $op => $response) {
+            self::assertSame(400, $response->status(), "[{$op}] ".$response->getContent());
+            self::assertSame('BAD_REQUEST', $response->json('code'), "[{$op}]");
+            self::assertStringStartsWith('malformed uuid', (string) $response->json('message'), "[{$op}]");
+        }
+    }
+
+    // list/set 走 locate_role → 400；clear 无甄别面（rails 直接 delete_all，cast 吞错
+    // 0 行 → 204，不预查镜像）——甄别命中直接 204 不落查询。
+    #[Test]
+    public function role_menu_ops_with_malformed_role_id_mirror_rails(): void
+    {
+        $auth = $this->authHeader($this->token);
+        $base = "/api/v1/tenants/{$this->tenantId}/roles/not-a-uuid/menus";
+
+        $list = $this->getJson($base, $auth);
+        self::assertSame(400, $list->status(), $list->getContent());
+        self::assertSame('BAD_REQUEST', $list->json('code'));
+
+        $set = $this->putJson($base, ['menuIds' => []], $auth);
+        self::assertSame(400, $set->status(), $set->getContent());
+        self::assertSame('BAD_REQUEST', $set->json('code'));
+
+        $clear = $this->deleteJson($base, [], $auth);
+        self::assertSame(204, $clear->status(), $clear->getContent());
+    }
+
     // ---- 数据工厂（事务内，回滚不留痕） ----
 
     private function aliceMemberId(): string
