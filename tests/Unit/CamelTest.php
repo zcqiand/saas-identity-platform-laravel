@@ -69,4 +69,15 @@ final class CamelTest extends TestCase
         // 值本身不做变换（含值内的下划线字符串）——只转 key（key a_b → aB，值 c_d 原样）。
         $this->assertSame(['aB' => 'c_d', 'list' => ['a_b', 'c_d']], Camel::deep(['a_b' => 'c_d', 'list' => ['a_b', 'c_d']]));
     }
+
+    #[Test]
+    public function null_elements_in_lists_are_preserved(): void
+    {
+        // rails JsonCamelizeKey Array 分支镜像：list 逐元素递归、原样保序保 null——
+        // null 剔除只作用于 map 的键值（Hash 分支），不波及列表元素（round 1 评审 I-1）。
+        $this->assertSame(
+            ['items' => [null, ['snakeKey' => 1], 'x']],
+            Camel::deep(['items' => [null, ['snake_key' => 1], 'x']])
+        );
+    }
 }

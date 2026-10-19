@@ -14,6 +14,13 @@ final class Camel
      */
     public static function deep(array $data): array
     {
+        // rails JsonCamelizeKey Array 分支镜像：list 逐元素递归、原样保序保 null——
+        // null 剔除只作用于 map 的键值，不波及列表元素；也避免 map 分支剔键后
+        // 非连续数字键让 json_encode 把数组退化成对象（{"0":..,"2":..}）。
+        if (array_is_list($data)) {
+            return array_map(fn ($value) => is_array($value) ? self::deep($value) : $value, $data);
+        }
+
         $out = [];
         foreach ($data as $key => $value) {
             if ($value === null) {

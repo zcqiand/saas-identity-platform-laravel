@@ -6,6 +6,7 @@ use App\Exceptions\Jwt\TokenExpired;
 use App\Exceptions\Jwt\TokenInvalid;
 use App\Services\Auth\JwtService;
 use Illuminate\Support\Env;
+use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\Support\TestJwt;
@@ -77,7 +78,11 @@ final class JwtTest extends TestCase
         $this->removeEnv('JWT_SIGNING_KEY');
         try {
             new JwtService;
-            $this->fail('缺 JWT_SIGNING_KEY 必须 throw（fail-fast，禁 env 默认值兜底——suite-hard-rules §1）');
+            self::fail('缺 JWT_SIGNING_KEY 必须 throw（fail-fast，禁 env 默认值兜底——suite-hard-rules §1）');
+        } catch (AssertionFailedError $e) {
+            // fail() 抛的 AssertionFailedError 是 RuntimeException 子类，必须先接住重抛，
+            // 否则构造器不 throw 时测试被自己的 catch 吞成假绿。
+            throw $e;
         } catch (RuntimeException $e) {
             $this->assertStringContainsString('JWT_SIGNING_KEY', $e->getMessage());
         } finally {
@@ -92,7 +97,29 @@ final class JwtTest extends TestCase
         $this->removeEnv('JWT_TTL_SECONDS');
         try {
             new JwtService;
-            $this->fail('缺 JWT_TTL_SECONDS 必须 throw（fail-fast——suite-hard-rules §1）');
+            self::fail('缺 JWT_TTL_SECONDS 必须 throw（fail-fast——suite-hard-rules §1）');
+        } catch (AssertionFailedError $e) {
+            throw $e; // 同上：fail() 不得被下面的 RuntimeException catch 吞掉
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('JWT_TTL_SECONDS', $e->getMessage());
+        } finally {
+            $this->restoreEnv('JWT_TTL_SECONDS', $saved);
+        }
+    }
+
+    #[Test]
+    public function ttl_with_trailing_newline_throws_fail_fast(): void
+    {
+        // 与 UUID_RE 同族：regex $ 无 D 修饰符会放行尾随 \n（round 1 评审 M-2，无害方向
+        // 但一处修完）——"3600\n" 不是合法正整数。
+        $saved = Env::get('JWT_TTL_SECONDS');
+        $_ENV['JWT_TTL_SECONDS'] = "3600\n";
+        $_SERVER['JWT_TTL_SECONDS'] = "3600\n";
+        try {
+            new JwtService;
+            self::fail('JWT_TTL_SECONDS 带尾随换行必须 throw（\z 严格语义）');
+        } catch (AssertionFailedError $e) {
+            throw $e; // 同上
         } catch (RuntimeException $e) {
             $this->assertStringContainsString('JWT_TTL_SECONDS', $e->getMessage());
         } finally {

@@ -27,7 +27,8 @@ final class JwtService
             throw new RuntimeException('JWT_SIGNING_KEY 未设（fail-fast，禁 env 默认值兜底——suite-hard-rules §1）');
         }
         $ttl = Env::get('JWT_TTL_SECONDS');
-        if (! is_string($ttl) || preg_match('/^\d+$/', $ttl) !== 1) {
+        // D 修饰符与 UUID_RE 同族（round 1 M-2）：禁 $ 匹配尾随换行，"3600\n" 不放行。
+        if (! is_string($ttl) || preg_match('/^\d+$/D', $ttl) !== 1) {
             throw new RuntimeException('JWT_TTL_SECONDS 未设或非正整数（fail-fast，禁 env 默认值兜底——suite-hard-rules §1）');
         }
         $this->signingKey = $key;

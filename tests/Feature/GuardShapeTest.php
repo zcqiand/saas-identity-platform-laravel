@@ -232,6 +232,20 @@ final class GuardShapeTest extends TestCase
     }
 
     #[Test]
+    public function uuid_param_with_trailing_newline_is_400_not_404(): void
+    {
+        // rails UUID_RE \z 严格语义镜像：尾随 \n 不算合法 uuid（PHP $ 无 D 修饰符时
+        // 匹配尾随换行前的位置——漏判会把坏 uuid 走 404「查无」口径，round 1 评审 M-1）。
+        $uuid = "00000000-0000-0000-0000-000000000000\n";
+        $request = $this->requestWithRouteParams(['id' => $uuid]);
+
+        $response = $this->renderException($this->notFound([$uuid]), $request);
+
+        $this->assertSame(400, $response->getStatusCode());
+        $this->assertSame('BAD_REQUEST', $this->bodyOf($response)['code']);
+    }
+
+    #[Test]
     public function integrity_violation_renders_400_constraint_violation(): void
     {
         $e = new UniqueConstraintViolationException(

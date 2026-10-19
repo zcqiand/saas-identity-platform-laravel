@@ -13,7 +13,9 @@ use InvalidArgumentException;
 // 表逐行镜像，recon §2.1）；本基座供 Task 5-10 控制器消费渲染/分页/甄别面。
 abstract class Controller
 {
-    private const UUID_RE = '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/';
+    // rails \z 严格语义镜像（round 1 M-1）：D 修饰符禁 $ 匹配尾随换行——否则 "uuid\n"
+    // 被当合法格式走 404「查无」而非 400「malformed uuid」。
+    private const UUID_RE = '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/D';
 
     /**
      * snake_case → lowerCamel 深变换渲染（家族 DTO 形状是 camelCase，DB 列是 snake_case）。
