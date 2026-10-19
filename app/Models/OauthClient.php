@@ -8,7 +8,23 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $client_id
+ * @property string $client_secret
+ * @property string $client_name
+ * @property string $grant_types
+ * @property string $redirect_uris
+ * @property string|null $scopes
+ * @property int $access_token_validity
+ * @property int $refresh_token_validity
+ * @property bool $auto_approve
+ * @property int $status
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ */
 class OauthClient extends Generated\OauthClient
 {
     public function tenantApplications(): HasMany

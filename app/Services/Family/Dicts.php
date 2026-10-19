@@ -51,4 +51,15 @@ final class Dicts
             default => 'menu',
         };
     }
+
+    // 反向字典（rails menu_type_code 镜像）：未知字符串 → ArgumentError → 基座 400
+    public static function menuTypeCode(string $value): int
+    {
+        return match ($value) {
+            'directory' => 1,
+            'menu' => 2,
+            'button' => 3,
+            default => throw new \InvalidArgumentException('type: must be one of directory/menu/button'),
+        };
+    }
 }
