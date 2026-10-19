@@ -63,6 +63,8 @@ final class TenantMembersController extends Controller
     // @impl M00.F02.I02 (book anchor xr-know-012)
     public function createTenantUser(Request $request): JsonResponse
     {
+        TenantGuard::verifyPathTenant($request);
+
         $body = [];
         foreach (['username', 'password', 'email'] as $key) {
             $value = $request->input($key);
@@ -110,6 +112,7 @@ final class TenantMembersController extends Controller
     // @impl M00.F02.I03 (book anchor xr-know-012)
     public function getTenantUser(Request $request): JsonResponse
     {
+        TenantGuard::verifyPathTenant($request);
         [$member, $user] = $this->locateMember($request);
 
         return $this->renderCamel(MemberViews::flatUserView($member, $user));
@@ -120,6 +123,7 @@ final class TenantMembersController extends Controller
     // @impl M00.F02.I04 (book anchor xr-know-012)
     public function updateTenantUser(Request $request): JsonResponse
     {
+        TenantGuard::verifyPathTenant($request);
         [$member, $user] = $this->locateMember($request);
 
         $updates = [];
@@ -142,6 +146,7 @@ final class TenantMembersController extends Controller
     // @impl M00.F02.I05 (book anchor xr-know-012)
     public function deleteTenantUser(Request $request): Response
     {
+        TenantGuard::verifyPathTenant($request);
         [$member] = $this->locateMember($request);
 
         TenantMemberRole::query()->where('member_id', (string) $member->id)->delete();
@@ -155,6 +160,7 @@ final class TenantMembersController extends Controller
     // @impl M00.F02.I08 (book anchor xr-know-012)
     public function changeTenantUserStatus(Request $request): JsonResponse
     {
+        TenantGuard::verifyPathTenant($request);
         [$member, $user] = $this->locateMember($request);
 
         $status = $request->input('status');
@@ -180,6 +186,7 @@ final class TenantMembersController extends Controller
     // @impl M01.F02.I01 (book anchor xr-know-012)
     public function assignTenantMemberRoles(Request $request): JsonResponse
     {
+        TenantGuard::verifyPathTenant($request);
         [$member, $user] = $this->locateMember($request);
 
         $roleIds = $request->input('roleIds');
@@ -206,6 +213,8 @@ final class TenantMembersController extends Controller
     // @impl M00.F02.I06 (book anchor xr-know-012)
     public function inviteTenantUser(Request $request): JsonResponse
     {
+        TenantGuard::verifyPathTenant($request);
+
         $email = trim((string) $request->input('email'));
         if ($email === '') {
             throw new InvalidArgumentException('email: is required');

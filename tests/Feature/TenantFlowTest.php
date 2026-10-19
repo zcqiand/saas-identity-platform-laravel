@@ -373,6 +373,62 @@ final class TenantFlowTest extends TestCase
         self::assertSame('BAD_REQUEST', $response->json('code'));
     }
 
+    // C-1 反向面（Round 1 评审）：JWT tenant claim ≠ path tenantId → guard 403 拒绝。
+    // 8 op 全覆盖——guard 缺失时 create/invite 会 200 跨租户写、locate 组会 404 泄露语义漂移。
+    #[Test]
+    public function cross_tenant_token_is_403_on_all_member_ops(): void
+    {
+        $otherTenantId = $this->makeTenant('tf-guard');
+        $userId = $this->makeUser('tf-guard-user-'.Str::random(4));
+        $this->makeMember($otherTenantId, $userId, 1);
+        $base = "/api/v1/tenants/{$otherTenantId}";
+        $h = $this->authHeader($this->token);
+
+        $responses = [
+            'list' => $this->getJson("{$base}/members", $h),
+            'create' => $this->postJson("{$base}/members", [
+                'username' => 'tf-guard-new', 'password' => 'password123', 'email' => 'tf-guard-new@x.io',
+            ], $h),
+            'get' => $this->getJson("{$base}/members/{$userId}", $h),
+            'update' => $this->patchJson("{$base}/members/{$userId}", ['email' => 'n@x.io'], $h),
+            'delete' => $this->deleteJson("{$base}/members/{$userId}", [], $h),
+            'status' => $this->patchJson("{$base}/members/{$userId}/status", ['status' => 'suspended'], $h),
+            'assign' => $this->putJson("{$base}/members/{$userId}/roles", ['roleIds' => []], $h),
+            'invite' => $this->postJson("{$base}/members/invitations", ['email' => 'tf-guard-inv@x.io'], $h),
+        ];
+        foreach ($responses as $op => $response) {
+            self::assertSame(403, $response->status(), "{$op} must 403, got {$response->status()}");
+        }
+        self::assertSame('FORBIDDEN', $responses['list']->json('code'));
+
+        // 守卫在先：跨租户行零改动（create/invite 未落行、status 双写未发生）
+        self::assertSame(1, TenantMember::query()->where('tenant_id', $otherTenantId)->count());
+        self::assertSame(0, SysUser::query()->where('username', 'tf-guard-new')->count());
+        self::assertSame(1, (int) TenantMember::query()->where('user_id', $userId)->firstOrFail()->status);
+    }
+
+    // M-1（Round 1 评审）：缺/空白 status → 400（rails params.require(:status) 镜像），行不被改
+    #[Test]
+    public function change_tenant_user_status_missing_or_blank_is_400(): void
+    {
+        $userId = $this->makeUser('tf-status400-'.Str::random(4));
+        $this->makeMember($this->tenantId, $userId, 1);
+        $url = "/api/v1/tenants/{$this->tenantId}/members/{$userId}/status";
+        $h = $this->authHeader($this->token);
+
+        $missing = $this->patchJson($url, [], $h);
+        self::assertSame(400, $missing->status());
+        self::assertSame('BAD_REQUEST', $missing->json('code'));
+
+        $blank = $this->patchJson($url, ['status' => '   '], $h);
+        self::assertSame(400, $blank->status());
+        self::assertSame('BAD_REQUEST', $blank->json('code'));
+
+        // 400 路径不落库
+        self::assertSame(1, (int) TenantMember::query()->where('user_id', $userId)->firstOrFail()->status);
+        self::assertSame(1, (int) SysUser::query()->where('id', $userId)->firstOrFail()->status);
+    }
+
     // ---- tenant-roles（5 op） ----
 
     // rails create_sys_role 镜像：DTO 形状 + isPreset 缺省 false + status 1
@@ -518,6 +574,37 @@ final class TenantFlowTest extends TestCase
         self::assertSame(0, SysRole::query()->where('id', $roleId)->count());
         self::assertSame(0, SysRoleMenu::query()->where('role_id', $roleId)->count());
         self::assertSame(0, TenantMemberRole::query()->where('role_id', $roleId)->count());
+    }
+
+    // C-1 反向面（Round 1 评审）：roles 5 op + role-menus 3 op 逐 op 守卫复核（回归面钉死）
+    #[Test]
+    public function cross_tenant_token_is_403_on_role_and_role_menu_ops(): void
+    {
+        $otherTenantId = $this->makeTenant('tf-role-guard');
+        $roleId = $this->makeRole($otherTenantId);
+        $base = "/api/v1/tenants/{$otherTenantId}";
+        $h = $this->authHeader($this->token);
+
+        $responses = [
+            'roles.list' => $this->getJson("{$base}/roles", $h),
+            'roles.create' => $this->postJson("{$base}/roles", [
+                'clientId' => 'tf-guard-client', 'roleCode' => 'tf_guard', 'roleName' => 'Guard',
+            ], $h),
+            'roles.get' => $this->getJson("{$base}/roles/{$roleId}", $h),
+            'roles.update' => $this->patchJson("{$base}/roles/{$roleId}", ['roleName' => 'Hacked'], $h),
+            'roles.delete' => $this->deleteJson("{$base}/roles/{$roleId}", [], $h),
+            'menus.list' => $this->getJson("{$base}/roles/{$roleId}/menus", $h),
+            'menus.set' => $this->putJson("{$base}/roles/{$roleId}/menus", ['menuIds' => []], $h),
+            'menus.clear' => $this->deleteJson("{$base}/roles/{$roleId}/menus", [], $h),
+        ];
+        foreach ($responses as $op => $response) {
+            self::assertSame(403, $response->status(), "{$op} must 403, got {$response->status()}");
+        }
+
+        // 行零改动（roles.create 未落行、roles.update 未改名、menus.set 未动 grant）
+        self::assertSame(1, SysRole::query()->where('id', $roleId)->count());
+        self::assertSame('TF Role', (string) SysRole::query()->where('id', $roleId)->firstOrFail()->role_name);
+        self::assertSame(0, SysRole::query()->where('role_code', 'tf_guard')->count());
     }
 
     // ---- tenant-role-menus（3 op） ----

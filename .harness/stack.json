@@ -18,7 +18,8 @@
       "cmd": [
         "php",
         "vendor/phpstan/phpstan/phpstan",
-        "analyse"
+        "analyse",
+        "--memory-limit=1G"
       ],
       "fix": "先确认 composer install 已跑。逐条修复 phpstan 报告；基线不收紧不放松，规则误伤在 phpstan.neon 加定向 ignore 并写理由，禁改门定义。"
     },
