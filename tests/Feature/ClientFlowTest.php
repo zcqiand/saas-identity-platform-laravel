@@ -319,6 +319,48 @@ final class ClientFlowTest extends TestCase
         self::assertSame(204, $unknown->status(), $unknown->getContent());
     }
 
+    // I-1（Round 1 评审）：rails deleteById 对非法 menuId 由 AR cast 吞错 → 恒 204，
+    // 不得 22P02 → 500 分叉（同 locateMenu 前置甄别，但 delete 语义无 404/400 面）
+    #[Test]
+    public function delete_sys_menu_malformed_uuid_is_204(): void
+    {
+        $clientId = $this->makeClient('tf-menu-del-bad');
+
+        $response = $this->deleteJson(
+            "/api/v1/clients/{$clientId}/menus/not-a-uuid",
+            [],
+            $this->authHeader($this->token)
+        );
+
+        self::assertSame(204, $response->status(), $response->getContent());
+    }
+
+    // M-1（Round 1 评审）：rails presence/present? 的 blank 语义——纯空白 parentId 等价缺省：
+    // create 落 ROOT_MENU_ID、move 不改挂（均 200），不得 22P02 → 500
+    #[Test]
+    public function blank_parent_id_falls_back_to_root_and_move_is_noop(): void
+    {
+        $clientId = $this->makeClient('tf-menu-blank');
+
+        $created = $this->postJson(
+            "/api/v1/clients/{$clientId}/menus",
+            ['title' => 'TF-Blank', 'parentId' => '   '],
+            $this->authHeader($this->token)
+        );
+        self::assertSame(200, $created->status(), $created->getContent());
+        self::assertSame(SysMenu::ROOT_MENU_ID, $created->json('parentId'));
+        $menuId = (string) $created->json('id');
+
+        $moved = $this->patchJson(
+            "/api/v1/clients/{$clientId}/menus/{$menuId}/parent",
+            ['parentId' => '   '],
+            $this->authHeader($this->token)
+        );
+        self::assertSame(200, $moved->status(), $moved->getContent());
+        self::assertSame(SysMenu::ROOT_MENU_ID, $moved->json('parentId'));
+        self::assertSame(SysMenu::ROOT_MENU_ID, (string) SysMenu::query()->where('id', $menuId)->firstOrFail()->parent_id);
+    }
+
     // rails include TenantGuard 镜像：client-menus 无 token → 401（无租户缝，无 403 面）
     #[Test]
     public function client_menus_requires_jwt(): void
@@ -433,6 +475,34 @@ final class ClientFlowTest extends TestCase
         $row2 = TenantApplication::query()
             ->where('tenant_id', $this->tenantId)->where('client_id', $clientId2)->firstOrFail();
         self::assertNull($row2->expire_time);
+    }
+
+    // M-2（Round 1 评审）：rails AR datetime cast 对垃圾串 → nil（行落 null、200），
+    // 不得 Carbon cast 抛 → 500。subscribe 与 update 同语义（update 同样 null 化）
+    #[Test]
+    public function garbage_expire_time_casts_to_null(): void
+    {
+        $clientId = $this->makeClient('tf-app-garbage');
+
+        $subscribed = $this->postJson(
+            "/api/v1/tenants/{$this->tenantId}/applications",
+            ['clientId' => $clientId, 'expireTime' => 'not-a-date'],
+            $this->authHeader($this->token)
+        );
+        self::assertSame(200, $subscribed->status(), $subscribed->getContent());
+        self::assertArrayNotHasKey('expireTime', $subscribed->json());
+        $app = TenantApplication::query()
+            ->where('tenant_id', $this->tenantId)->where('client_id', $clientId)->firstOrFail();
+        self::assertNull($app->expire_time);
+
+        $updated = $this->patchJson(
+            "/api/v1/tenants/{$this->tenantId}/applications/{$clientId}",
+            ['expireTime' => 'also-garbage'],
+            $this->authHeader($this->token)
+        );
+        self::assertSame(200, $updated->status(), $updated->getContent());
+        self::assertArrayNotHasKey('expireTime', $updated->json());
+        self::assertNull($app->refresh()->expire_time);
     }
 
     // rails ensure_subscribable! 镜像：dup 预检 → 400 clean message（不盲插不泄漏驱动诊断）

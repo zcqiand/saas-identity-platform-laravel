@@ -8,6 +8,7 @@ use App\Models\TenantApplication;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -46,7 +47,7 @@ final class TenantApplicationsController extends Controller
             'tenant_id' => (string) $request->route('tenantId'),
             'client_id' => $clientId,
             'status' => 1,
-            'expire_time' => $request->input('expireTime'),
+            'expire_time' => $this->castExpireTime($request->input('expireTime')),
             'created_at' => Date::now(),
         ]);
         $app->save();
@@ -67,7 +68,7 @@ final class TenantApplicationsController extends Controller
         }
         $expireTime = $request->input('expireTime');
         if ($expireTime !== null && ! (is_string($expireTime) && trim($expireTime) === '')) {
-            $updates['expire_time'] = $expireTime;
+            $updates['expire_time'] = $this->castExpireTime($expireTime);
         }
         if ($updates !== []) {
             $app->fill($updates);
@@ -130,6 +131,23 @@ final class TenantApplicationsController extends Controller
         }
 
         return $app;
+    }
+
+    // M-2（Round 1 评审）：rails AR datetime cast 语义——垃圾串 cast → nil 落库（200），
+    // 不得 Eloquent datetime cast 抛 InvalidFormatException 分叉。可解析 → Carbon，垃圾/空 → null
+    private function castExpireTime(mixed $value): ?Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Date::parse($value);
+        } catch (\Throwable) {
+            // Date facade 的 @method 签名不带 @throws（phpstan catch.neverThrown），
+            // 放宽到 Throwable——parse 失败族（InvalidFormatException 等）全归 nil
+            return null;
+        }
     }
 
     // rails app_dto 镜像：expireTime null → 渲染层剔键

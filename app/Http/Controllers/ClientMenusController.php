@@ -131,10 +131,15 @@ final class ClientMenusController extends Controller
         return $this->renderCamel($menus->map(fn (SysMenu $row): array => $this->menuDto($row))->all());
     }
 
-    // deleteById 语义：不预查，恒 204
+    // deleteById 语义：不预查，恒 204。非法 menuId 前置甄别（I-1）：rails AR cast 吞错
+    // → 恒 204，PG uuid 列直查会 22P02 → 500 分叉；delete 无 404/400 面，甄别命中直接 204
     // @impl M04.F04.I05 (book anchor xr-know-012)
     public function deleteSysMenu(Request $request): Response
     {
+        if (self::badUuidParam($request) !== null) {
+            return response()->noContent();
+        }
+
         SysMenu::query()->where('id', (string) $request->route('menuId'))->delete();
 
         return response()->noContent();
