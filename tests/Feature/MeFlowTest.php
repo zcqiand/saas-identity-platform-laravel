@@ -84,8 +84,10 @@ final class MeFlowTest extends TestCase
         $response = $this->getJson('/api/v1/me/menus', $this->authHeader($this->token));
 
         self::assertSame(200, $response->status());
+        // rails 渲染 Hash → JSON 对象：raw body 解码必须是 object（assertIsArray 对 [] 也
+        // 放行是弱化点——空集对象性由下一个专用用例钉死，此处断非空 map 的对象形状）
+        self::assertIsObject(json_decode((string) $response->getContent()));
         $body = $response->json();
-        self::assertIsArray($body);
         // clientId 分组：本测试造的两个 client 键必须在（种子若另有授权不碍事）
         self::assertArrayHasKey('tree-client-a', $body);
         self::assertArrayHasKey('tree-client-b', $body);
@@ -114,6 +116,30 @@ final class MeFlowTest extends TestCase
 
         // client-b 组只有一根
         self::assertSame(['D-Menu'], array_column($body['tree-client-b'], 'title'));
+    }
+
+    // I-1 钉子：rails MenuTree 三处 return {} —— 无授权成员 /me/menus 渲染 JSON 对象 {}
+    // 非 []（json_encode 空 PHP 数组退化为 []，须显式对象渲染）。
+    #[Test]
+    public function me_menus_without_grants_renders_empty_json_object_not_array(): void
+    {
+        SysUser::query()->create([
+            'username' => 'menuless',
+            'password' => 'plain:pw',
+            'email' => 'menuless@x',
+            'status' => 1,
+            'failed_attempts' => 0,
+        ]);
+        $userId = (string) SysUser::query()->where('username', 'menuless')->firstOrFail()->id;
+        $this->makeTenantWithMember($userId, 1);
+
+        $body = $this->loginBody($this->login(username: 'menuless', password: 'pw'));
+        $response = $this->getJson('/api/v1/me/menus', $this->authHeader((string) $body['accessToken']));
+
+        self::assertSame(200, $response->status());
+        $decoded = json_decode((string) $response->getContent());
+        self::assertIsObject($decoded);
+        self::assertSame([], (array) $decoded);
     }
 
     // rails 'me tenants returns bare active membership array' 1:1
@@ -201,6 +227,7 @@ final class MeFlowTest extends TestCase
         $response = $this->postJson("/api/v1/me/tenants/{$tenantId}/switch", [], $this->authHeader($this->token));
 
         self::assertSame(404, $response->status());
+        self::assertSame('NOT_FOUND', $response->json('code'));
     }
 
     // rails 'tenant not found' 分支：合法 uuid 查无 → 404（NOT_FOUND）。

@@ -53,9 +53,16 @@ final class MeController extends Controller
     // @impl M04.F04.I08 (book anchor xr-know-012)
     public function getMyMenus(Request $request): JsonResponse
     {
-        return $this->renderCamel(
-            (new MenuTree((string) $request->attributes->get('currentUserId')))->call()
-        );
+        $tree = (new MenuTree((string) $request->attributes->get('currentUserId')))->call();
+        // rails MenuTree 三处 return {} 镜像：空集渲染 JSON 对象 {} 非 []——PHP 空
+        // 数组 json_encode 退化为 []，须显式 stdClass（round 1 I-1；PHP 数组无法表达
+        // 「空关联数组」，对象性在渲染边界落地）。非空 clientId 分组 map 经
+        // Camel::deep 走 map 分支自然成对象。
+        if ($tree === []) {
+            return response()->json(new \stdClass);
+        }
+
+        return $this->renderCamel($tree);
     }
 
     // @impl M01.F03.I02 (book anchor xr-know-012)
