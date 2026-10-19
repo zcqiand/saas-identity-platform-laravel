@@ -84,7 +84,11 @@ foreach ($spec['paths'] as $path => $item) {
         // requiredFields: the request schema's required list (default [])
         $requiredFields = [];
         if ($requestSchema !== null) {
-            $requiredFields = $spec['components']['schemas'][$requestSchema]['required'] ?? [];
+            $schemaNode = $spec['components']['schemas'][$requestSchema] ?? null;
+            $requiredFields = is_array($schemaNode) ? ($schemaNode['required'] ?? []) : [];
+            if (! is_array($requiredFields)) {
+                $requiredFields = [];
+            }
         }
 
         $entry = [
@@ -121,5 +125,8 @@ if (str_contains($json, "\r")) {
     fwrite(STDERR, "ERROR: CR byte in output, refusing to write (determinism)\n");
     exit(1);
 }
-file_put_contents($outPath, $json);
+if (file_put_contents($outPath, $json) === false) {
+    fwrite(STDERR, "ERROR: write failed: {$outPath}\n");
+    exit(1);
+}
 echo '[gen-manifest] '.count($operations)." operations -> {$outPath}\n";
