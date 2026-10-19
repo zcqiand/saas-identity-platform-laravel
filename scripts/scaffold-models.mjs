@@ -160,12 +160,21 @@ async function main() {
     const pkCols = compositePKs.get(tbl.table_name) ?? null;
     const isCompositePK = pkCols != null;
 
+    // 单列 uuid PK 表才有 $incrementing/$keyType 语义；复合主键表两行皆无意义（评审 I-1）。
+    const incrementingBlock = isCompositePK
+      ? ""
+      : `
+    public $incrementing = false;
+
+    protected $keyType = 'string';
+`;
+
     const fillable = cols.map((c) => `        '${c.column_name}',`);
     const casts = cols.map((c) => `        '${c.column_name}' => '${mapCast(c.data_type, c.udt_name)}',`);
 
     // 复合主键：$primaryKey = null（brief 精确行）。不带 @var 标签——父类 Model::$primaryKey
-    // @var string 与 string|null 不协变（phpstan property.phpDocType），放宽走 phpstan.neon
-    // 定向 ignoreErrors（stack.json 口径：规则误伤加定向 ignore 并写理由）。
+    // @var string 与 string|null 不协变（phpstan property.phpDocType 会红），置 null 本身
+    // larastan L5 实测不报，无需 ignore。
     const primaryKeyBlock = isCompositePK
       ? `
     // 复合主键：${pkCols.join(" + ")}（两列联合主键，真源=information_schema）。
@@ -201,10 +210,11 @@ class ${className} extends Model
 {
     protected $table = '${tbl.table_name}';
 
-    public $incrementing = false;
-
-    protected $keyType = 'string';
-${primaryKeyBlock}
+    // Eloquent 默认 $timestamps=true 且不查列存在性——saas_dev 实测 7/12 表无 updated_at
+    // （首写即 SQLSTATE 42703），12 表全量关自动时间戳（评审 I-1）。时间戳由业务代码
+    // 显式写列（DB-First：created_at/updated_at 是普通列）。
+    public $timestamps = false;
+${incrementingBlock}${primaryKeyBlock}
     /** @var list<string> */
     protected $fillable = [
 ${fillable.join("\n")}

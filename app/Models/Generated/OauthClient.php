@@ -20,6 +20,11 @@ class OauthClient extends Model
 {
     protected $table = 'oauth_client';
 
+    // Eloquent 默认 $timestamps=true 且不查列存在性——saas_dev 实测 7/12 表无 updated_at
+    // （首写即 SQLSTATE 42703），12 表全量关自动时间戳（评审 I-1）。时间戳由业务代码
+    // 显式写列（DB-First：created_at/updated_at 是普通列）。
+    public $timestamps = false;
+
     public $incrementing = false;
 
     protected $keyType = 'string';

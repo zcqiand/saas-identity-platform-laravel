@@ -22,9 +22,10 @@ class SysRoleMenu extends Model
 {
     protected $table = 'sys_role_menu';
 
-    public $incrementing = false;
-
-    protected $keyType = 'string';
+    // Eloquent 默认 $timestamps=true 且不查列存在性——saas_dev 实测 7/12 表无 updated_at
+    // （首写即 SQLSTATE 42703），12 表全量关自动时间戳（评审 I-1）。时间戳由业务代码
+    // 显式写列（DB-First：created_at/updated_at 是普通列）。
+    public $timestamps = false;
 
     // 复合主键：role_id + menu_id（两列联合主键，真源=information_schema）。
     // Eloquent 不支持原生复合主键——置 null 禁用单键 find() 语义，
