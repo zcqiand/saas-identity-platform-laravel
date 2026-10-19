@@ -1,4 +1,4 @@
-功能清单（Function Tree） — saas-identity-platform-laravel
+# 功能清单（Function Tree） — saas-identity-platform-laravel
 
 > **全体系唯一锚点。** 需求、流程、设计、测试都引用这里的 ID。
 > 不在这里的 ID 是悬空引用，L5 门会拦。**改功能，先改这份表。**
