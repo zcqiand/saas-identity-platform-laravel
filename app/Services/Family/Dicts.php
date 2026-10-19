@@ -19,4 +19,15 @@ final class Dicts
             default => 'disabled',
         };
     }
+
+    // sys_menu.type：1=directory 2=menu 3=button，未知→menu（MenuTree 节点装配消费）
+    public static function menuType(int|string|null $value): string
+    {
+        return match ((int) $value) {
+            1 => 'directory',
+            2 => 'menu',
+            3 => 'button',
+            default => 'menu',
+        };
+    }
 }

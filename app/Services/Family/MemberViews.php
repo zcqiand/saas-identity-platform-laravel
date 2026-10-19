@@ -38,4 +38,19 @@ final class MemberViews
             'joined_at' => $member->created_at,
         ];
     }
+
+    /**
+     * 全量 memberships（whoami 用，含非 active；rails MemberViews.memberships_for 镜像）。
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function membershipsFor(string $userId): array
+    {
+        return TenantMember::query()
+            ->where('user_id', $userId)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (TenantMember $member): array => self::membership($member))
+            ->all();
+    }
 }

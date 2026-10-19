@@ -9,7 +9,22 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $client_id
+ * @property string $parent_id
+ * @property string $title
+ * @property int $type
+ * @property string|null $path
+ * @property string|null $component
+ * @property string|null $perms
+ * @property string|null $icon
+ * @property int $sort_order
+ * @property int $status
+ * @property Carbon $created_at
+ */
 class SysMenu extends Generated\SysMenu
 {
     /** 根菜单哨兵：全零 UUID（rails SysMenu::ROOT_MENU_ID 同源）。 */
