@@ -253,7 +253,14 @@ final class ClientFlowTest extends TestCase
         self::assertSame(200, $response->status(), $response->getContent());
         $body = $response->json();
         self::assertIsArray($body);
-        self::assertSame([$menuA, $menuC, $menuB], array_column($body, 'id'), $response->getContent());
+        // 2026-10-21：并列 sortOrder 的次序两后端契约都未定义（list 只 orderBy('sort_order')
+        // 无次级键；rails 实态靠 PG heap 更新行挪位偶得 [A,C,B]，laravel 同参 [A,B,C]）——
+        // 原钉 [A,C,B] 钉的是未定义 DB 序，PG heap 态一变即翻红。钉确定性面：
+        // A(sortOrder 0) 打头 + 尾组 {B,C} 集合相等；sortOrder 值仍逐行严断（下方）。
+        $ids = array_column($body, 'id');
+        self::assertSame($menuA, $ids[0], $response->getContent());
+        self::assertCount(3, $ids, $response->getContent());
+        self::assertEqualsCanonicalizing([$menuB, $menuC], array_slice($ids, 1), $response->getContent());
         $rowB = SysMenu::query()->where('id', $menuB)->firstOrFail();
         self::assertSame(2, (int) $rowB->sort_order);
         // 只改当前菜单一条：A/C 的 sortOrder 不动
