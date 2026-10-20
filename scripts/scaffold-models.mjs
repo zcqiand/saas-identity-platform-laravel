@@ -25,19 +25,11 @@ import { writeFileSync, mkdirSync } from "node:fs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 
-// 借 pg driver（laravel 是 PHP 仓，没 node_modules；走 sibling nextjs，springboot 同款）
-const requireFromRuntime = createRequire(
-  resolve("/app/node_modules", "pg/package.json"),
-);
-let pg;
-try {
-  pg = requireFromRuntime("pg");
-} catch {
-  const nextjsRoot = resolve(ROOT, "../saas-identity-platform-nextjs");
-  const requireFromNext = createRequire(resolve(nextjsRoot, "package.json"));
-  pg = requireFromNext("pg");
-}
-const { Client } = pg;
+// 借 pg driver（laravel 是 PHP 仓，没 node_modules；走 sibling nextjs，springboot 同款。
+// 2026-10-20 清理批摘除 /app 容器死路径首试——本仓无容器运行形态）
+const nextjsRoot = resolve(ROOT, "../saas-identity-platform-nextjs");
+const requireFromNext = createRequire(resolve(nextjsRoot, "package.json"));
+const { Client } = requireFromNext("pg");
 
 // DATABASE_URL 必填。CLAUDE.md §2「禁止 env 默认值兜底」：连接串含 secret，
 // 不允许在脚本里写字面量兜底；缺则 fail-fast 让调用者补 env
