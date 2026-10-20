@@ -91,6 +91,23 @@ final class JwtTest extends TestCase
     }
 
     #[Test]
+    public function short_signing_key_throws_fail_fast(): void
+    {
+        $saved = Env::get('JWT_SIGNING_KEY');
+        $this->restoreEnv('JWT_SIGNING_KEY', 'short-key'); // 9 bytes < 32B 门槛
+        try {
+            new JwtService;
+            self::fail('JWT_SIGNING_KEY <32 bytes 必须 throw（HS256 弱键面，fail-fast——suite-hard-rules §1）');
+        } catch (AssertionFailedError $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('JWT_SIGNING_KEY', $e->getMessage());
+        } finally {
+            $this->restoreEnv('JWT_SIGNING_KEY', $saved);
+        }
+    }
+
+    #[Test]
     public function missing_ttl_throws_fail_fast(): void
     {
         $saved = Env::get('JWT_TTL_SECONDS');

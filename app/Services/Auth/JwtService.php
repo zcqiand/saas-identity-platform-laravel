@@ -28,8 +28,8 @@ final class JwtService
     public function __construct()
     {
         $key = Env::get('JWT_SIGNING_KEY');
-        if (! is_string($key) || $key === '') {
-            throw new RuntimeException('JWT_SIGNING_KEY 未设（fail-fast，禁 env 默认值兜底——suite-hard-rules §1）');
+        if (! is_string($key) || strlen($key) < 32) {
+            throw new RuntimeException('JWT_SIGNING_KEY 缺失或 <32 bytes（fail-fast，禁 env 默认值兜底——suite-hard-rules §1）');
         }
         $issuer = Env::get('JWT_ISSUER');
         if (! is_string($issuer) || $issuer === '') {

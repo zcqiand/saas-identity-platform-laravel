@@ -75,8 +75,6 @@ final class AdminClientsController extends Controller
         // rails update! 会 touch updated_at（timestamps=false 故显式写列）
         if ($updates !== []) {
             $updates['updated_at'] = Date::now();
-        }
-        if ($updates !== []) {
             $client->fill($updates);
             $client->save();
         }
