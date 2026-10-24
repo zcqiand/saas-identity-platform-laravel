@@ -30,7 +30,6 @@ RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-
 COPY app/ ./app/
 COPY bootstrap/ ./bootstrap/
 COPY config/ ./config/
-COPY database/ ./database/
 COPY public/ ./public/
 COPY routes/ ./routes/
 COPY artisan ./
