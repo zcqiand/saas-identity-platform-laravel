@@ -49,4 +49,6 @@ RUN php artisan package:discover
 RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/framework/logs storage/logs
 
 EXPOSE 5110
-CMD ["php", "artisan", "octane:start", "--server=frankenphp", "--host=0.0.0.0", "--port=5110"]
+# --admin-port 必须显式：octane 推算公式 2019+(port-8000)，端口 5110 会算出负数抛
+# 「Unable to determine admin port」（CI 冒烟 2026-10-25 首航前逮住）。
+CMD ["php", "artisan", "octane:start", "--server=frankenphp", "--host=0.0.0.0", "--port=5110", "--admin-port=2019"]

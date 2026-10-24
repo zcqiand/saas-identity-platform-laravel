@@ -43,7 +43,7 @@ jobs:
           chmod 0755 /usr/local/bin/frankenphp
           mkdir -p storage/framework/cache/data storage/framework/sessions \
             storage/framework/views storage/framework/logs storage/logs
-          php artisan octane:start --server=frankenphp --host=127.0.0.1 --port=5110 \
+          php artisan octane:start --server=frankenphp --host=127.0.0.1 --port=5110 --admin-port=2019 \
             > octane-smoke.log 2>&1 &
           ok=""
           for i in $(seq 1 60); do
