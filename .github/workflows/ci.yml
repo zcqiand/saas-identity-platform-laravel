@@ -1,0 +1,124 @@
+name: ci
+
+# saas-identity-platform-laravel (PHP 8.3 + Laravel 12 + laravel/octane 2.22)
+# 家族原则（镜像 fastapi/rails ci.yml 注释）：CI=门内静态两件 + octane 装配冒烟；
+# gate=全量（L4 phpunit 直连本机 PG，CI 无 PG 不跑测试——mock-friendly 纪律由
+# suite 门守，CI 只做无库依赖的装配验证）。
+# frankenphp v1.13.3 与 Dockerfile 钉版同源——升版必须双处同步（octane 要求 ≥1.13.0）。
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+      - name: 安装依赖（composer.lock 钉版）
+        run: composer install --prefer-dist --no-interaction --no-progress
+      - name: L1 格式（Pint）
+        run: php vendor/laravel/pint/builds/pint --test
+      - name: L2 静态检查（Larastan）
+        run: php vendor/phpstan/phpstan/phpstan analyse --memory-limit=1G
+      - name: octane(frankenphp) 装配冒烟 — /health 200
+        # 真实拉起 octane worker（与 prod 容器同一条启动路径），探 /health。
+        # env 占位值是显式提供（suite 硬规则 §1），装配期不连库，/health 不触 DB。
+        env:
+          DB_CONNECTION: pgsql
+          PG_HOST: localhost
+          PG_PORT: "5432"
+          PG_USER: placeholder
+          PG_PASSWORD: placeholder
+          PG_DATABASE: placeholder
+        run: |
+          curl -fsSL -o /usr/local/bin/frankenphp \
+            https://github.com/php/frankenphp/releases/download/v1.13.3/frankenphp-linux-x86_64-gnu
+          chmod 0755 /usr/local/bin/frankenphp
+          mkdir -p storage/framework/cache/data storage/framework/sessions \
+            storage/framework/views storage/framework/logs storage/logs
+          php artisan octane:start --server=frankenphp --host=127.0.0.1 --port=5110 \
+            > octane-smoke.log 2>&1 &
+          ok=""
+          for i in $(seq 1 60); do
+            body="$(curl -fsS --max-time 3 http://127.0.0.1:5110/health 2>/dev/null || true)"
+            if [ -n "$body" ]; then
+              echo "→ /health: $body"
+              echo "$body" | grep -q '"ok":true' && ok=1 && break
+            fi
+            sleep 1
+          done
+          if [ -z "$ok" ]; then
+            echo "ERROR: octane smoke /health 未 200（60s 上限），octane-smoke.log:" >&2
+            cat octane-smoke.log >&2
+            exit 1
+          fi
+
+  # 部署链（saas X10=5110；镜像 saas-identity-platform-fastapi deploy job，tag push 触发）:
+  #   docker build & push（latest + tag 双份）→ VPS deploy 脚本拉镜像 + 渲染 nginx vhost
+  #   + 起容器 + /health 探活。laravel.env 首启由 deploy 脚本从 SSH 透传 secrets 自举。
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
+    concurrency:
+      group: deploy-${{ github.event.repository.name }}-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}:latest
+            ${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}:${{ github.ref_name }}
+
+      - name: Pull image and restart container on VPS
+        uses: appleboy/ssh-action@v1
+        # appleboy/ssh-action@v1 的 ${{ secrets.* }} 不会自动进 SSH 远端 shell;
+        # step env 注入 Actions env,with.envs 列出要转发的名字 (逗号分隔)。
+        env:
+          PG_HOST: ${{ secrets.PG_HOST }}
+          PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
+          JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
+          NGINX_DOMAIN: ${{ vars.NGINX_DOMAIN }}
+          NGINX_CERT_BASENAME: ${{ vars.NGINX_CERT_BASENAME }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: PG_HOST,PG_PASSWORD,JWT_SIGNING_KEY,NGINX_DOMAIN,NGINX_CERT_BASENAME
+          script: |
+            # 自举: 首次部署无 /home/deploy/<repo>/ 时自动建 + 拉 deploy 脚本
+            set -e
+            REPO="${{ github.event.repository.name }}"
+            DEPLOY_DIR="/home/deploy/$REPO"
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
+            # 总是重拉最新 deploy 脚本（脚本 bug fix 立即生效）；nginx 模板由脚本自拉
+            curl -fsSL "https://raw.githubusercontent.com/zcqiand/${REPO}/refs/heads/master/deploy/${REPO}.sh" -o "$REPO.sh"
+            chmod +x "$REPO.sh"
+            # 缺 laravel.env 时, deploy 脚本从 SSH env 透传的 secrets 自举
+            # (UMASK 077, chmod 600)。后续 deploy 不需要这些 env (env-file 已存在)。
+            echo "→ env on remote: PG_PASSWORD_set=$([ -n \"${PG_PASSWORD:-}\" ] && echo yes || echo no)"
+            if [ ! -f "laravel.env" ] && [ -z "${PG_PASSWORD:-}" ]; then
+              echo "ERROR: laravel.env missing AND PG_PASSWORD secret not forwarded, deploy script will fail-fast" >&2
+            fi
+            sh "$REPO.sh" "${{ secrets.DOCKER_USERNAME }}" "${{ secrets.DOCKER_PASSWORD }}" "${{ github.ref_name }}"
