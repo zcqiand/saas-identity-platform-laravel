@@ -24,7 +24,7 @@ SaaS 身份平台 Laravel 端（`saas-identity-platform-laravel`，技术栈 `la
 
 ## 3. 技术栈与版本（钉死于 version-lock.json）
 
-PHP 8.3（NTS x64）+ Laravel 12 + laravel/octane ^2.22（REQ-2026-001 部署链；Octane server=frankenphp，二进制 v1.13.3 钉在 Dockerfile/ci.yml 双处同步）+ PHPUnit 11.5 + Pint ^1.13 + Larastan ^3.0（PHPStan 2.x）。composer 走腾讯镜像（mirrors.cloud.tencent.com/composer/；阿里云 dev-package repo-priority 冲突已弃）；门命令首词一律 php（EXEC_ALLOWLIST 已含 php/composer；vendor/bin/* 做首词会 ContractError）。无 L3：PHP 无编译门（rails 三门同构）。明细见 `version-lock.json` 与 README.md 技术栈表。
+PHP 8.3（NTS x64）+ Laravel 12 + laravel/octane ^2.22（REQ-2026-001 部署链；Octane server=frankenphp，运行时=dunglas/frankenphp:1.13.3-php8.3.36 官方镜像钉在 Dockerfile/ci.yml 双处同步，静态二进制路线已弃——1.13.3 静态版内嵌 PHP 8.5 与栈钉 drift）+ PHPUnit 11.5 + Pint ^1.13 + Larastan ^3.0（PHPStan 2.x）。composer 走腾讯镜像（mirrors.cloud.tencent.com/composer/；阿里云 dev-package repo-priority 冲突已弃）；门命令首词一律 php（EXEC_ALLOWLIST 已含 php/composer；vendor/bin/* 做首词会 ContractError）。无 L3：PHP 无编译门（rails 三门同构）。明细见 `version-lock.json` 与 README.md 技术栈表。
 
 门禁命令见 `.harness/stack.json`。**不要改它来让门变松。**
 

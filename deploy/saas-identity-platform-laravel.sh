@@ -9,11 +9,14 @@
 # CI 同时 push :latest + :<tag> 两份镜像,回滚只要手动指定旧 tag 再跑一次本脚本。
 #
 # 与姊妹仓 saas-identity-platform-fastapi.sh 的差异:
-#   - 运行时 PHP 8.3 + laravel/octane(frankenphp 静态二进制 v1.13.3,镜像内钉死),
+#   - 运行时 PHP 8.3.36 + laravel/octane(frankenphp 官方镜像 1.13.3-php8.3.36,
+#     Dockerfile 内钉死;静态二进制路线已弃——1.13.3 静态版内嵌 PHP 8.5 与栈钉 drift),
 #     健康探针 /health;端口 X10 段 5110(host=container)
 #   - laravel 读 PG_* 五件套 + DB_CONNECTION(config/database.php env() 无默认值兜底,
 #     缺 key 启动即 fail);无 DATABASE_URL 单串
-#   - env 契约 11 key = .env.example 全集(L0.5 parity;本仓无 CORS 中间件,不写 CORS key)
+#   - env 契约 12 key = .env.example 全集(L0.5 parity;本仓无 CORS 中间件,不写 CORS key)
+#   - APP_KEY octane worker boot 期必需(缺则 MissingAppKeyException,API 面不消费
+#     encrypter)——随机生成并持久化,同 JWT 先例
 #   - saas 是 IdP 本体:无 LAB_*/服务账号;JWT_SIGNING_KEY 沿 saas-rails 先例
 #     缺失时随机生成并持久化(自签自验,不与 lab 后端共享密钥)
 #
@@ -39,12 +42,14 @@ fi
 
 # laravel.env 自举保护: 缺失时, 如 PG_HOST/PG_PASSWORD 在环境里, 自动生成(含 JWT 契约值);
 # 否则 fail fast。setup-vps.sh 仍是首推(VPS 一次性), 本分支仅给"先有 env 临时上线"场景。
-# key 集合 = .env.example 全集 11 key(L0.5 deploy parity 的比对基线)。
+# key 集合 = .env.example 全集 12 key(L0.5 deploy parity 的比对基线)。
 if [ ! -f "$BASE/laravel.env" ]; then
   if [ -n "${PG_HOST:-}" ] && [ -n "${PG_PASSWORD:-}" ]; then
     echo "→ bootstrapping $BASE/laravel.env from env PG_HOST/PG_PASSWORD"
     umask 077
     {
+      # octane worker boot 期解析 encrypter,缺则 MissingAppKeyException;随机生成持久化
+      printf 'APP_KEY=base64:%s\n' "$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
       printf 'SERVER_PORT=5110\n'
       printf 'DB_CONNECTION=pgsql\n'
       printf 'PG_HOST=%s\n' "${PG_HOST:-100.79.128.25}"
@@ -133,6 +138,17 @@ if [ -f "$BASE/laravel.env" ]; then
     fi
   }
   append_if_missing SERVER_PORT '5110'
+  # APP_KEY 占位(upsert 空值行=首启自举前手建的 env)或缺失时随机生成并持久化
+  if grep -q '^APP_KEY=$' "$BASE/laravel.env" || ! grep -q '^APP_KEY=' "$BASE/laravel.env"; then
+    if grep -q '^APP_KEY=$' "$BASE/laravel.env"; then
+      sed -i "s#^APP_KEY=\$#APP_KEY=base64:$(head -c 32 /dev/urandom | base64 | tr -d '\n')#" "$BASE/laravel.env"
+      echo "→ generated APP_KEY (random, persisted) in existing $BASE/laravel.env"
+    else
+      echo "→ append APP_KEY (random, persisted) to existing $BASE/laravel.env"
+      umask 077
+      printf 'APP_KEY=base64:%s\n' "$(head -c 32 /dev/urandom | base64 | tr -d '\n')" >> "$BASE/laravel.env"
+    fi
+  fi
   append_if_missing DB_CONNECTION 'pgsql'
   append_if_missing PG_HOST '100.79.128.25'
   append_if_missing PG_PORT '5432'

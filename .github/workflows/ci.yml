@@ -4,7 +4,7 @@ name: ci
 # 家族原则（镜像 fastapi/rails ci.yml 注释）：CI=门内静态两件 + octane 装配冒烟；
 # gate=全量（L4 phpunit 直连本机 PG，CI 无 PG 不跑测试——mock-friendly 纪律由
 # suite 门守，CI 只做无库依赖的装配验证）。
-# frankenphp v1.13.3 与 Dockerfile 钉版同源——升版必须双处同步（octane 要求 ≥1.13.0）。
+# frankenphp 1.13.3 + PHP 8.3.36 官方镜像与 Dockerfile 钉版同源——升版双处同步（octane 要求 ≥1.13.0）。
 on:
   push:
     branches: [master]
@@ -27,10 +27,13 @@ jobs:
         run: php vendor/laravel/pint/builds/pint --test
       - name: L2 静态检查（Larastan）
         run: php vendor/phpstan/phpstan/phpstan analyse --memory-limit=1G
-      - name: octane(frankenphp) 装配冒烟 — /health 200
-        # 真实拉起 octane worker（与 prod 容器同一条启动路径），探 /health。
-        # env 占位值是显式提供（suite 硬规则 §1），装配期不连库，/health 不触 DB。
+      - name: octane 镜像装配冒烟 — build + run + /health 200
+        # 直接构建 prod 同款镜像并拉起（比 runner 级拉起更真：连 Dockerfile 一起验），
+        # 探 /health。env 占位值是显式提供（suite 硬规则 §1），装配期不连库，/health 不触 DB。
+        # APP_KEY 显式占位：octane worker boot 期解析 encrypter，缺则 MissingAppKeyException
+        # （2026-10-25 首航指纹；worker 把异常写进不可见 STDERR，只能靠探活超时暴露）。
         env:
+          APP_KEY: "base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
           DB_CONNECTION: pgsql
           PG_HOST: localhost
           PG_PORT: "5432"
@@ -38,13 +41,12 @@ jobs:
           PG_PASSWORD: placeholder
           PG_DATABASE: placeholder
         run: |
-          curl -fsSL -o /usr/local/bin/frankenphp \
-            https://github.com/php/frankenphp/releases/download/v1.13.3/frankenphp-linux-x86_64-gnu
-          chmod 0755 /usr/local/bin/frankenphp
-          mkdir -p storage/framework/cache/data storage/framework/sessions \
-            storage/framework/views storage/framework/logs storage/logs
-          php artisan octane:start --server=frankenphp --host=127.0.0.1 --port=5110 --admin-port=2019 \
-            > octane-smoke.log 2>&1 &
+          docker build -t octane-smoke .
+          docker rm -f octane-smoke >/dev/null 2>&1 || true
+          docker run -d --name octane-smoke -p 127.0.0.1:5110:5110 \
+            --env APP_KEY="$APP_KEY" --env DB_CONNECTION=pgsql --env PG_HOST=localhost \
+            --env PG_PORT=5432 --env PG_USER=placeholder --env PG_PASSWORD=placeholder \
+            --env PG_DATABASE=placeholder octane-smoke
           ok=""
           for i in $(seq 1 60); do
             body="$(curl -fsS --max-time 3 http://127.0.0.1:5110/health 2>/dev/null || true)"
@@ -55,10 +57,12 @@ jobs:
             sleep 1
           done
           if [ -z "$ok" ]; then
-            echo "ERROR: octane smoke /health 未 200（60s 上限），octane-smoke.log:" >&2
-            cat octane-smoke.log >&2
+            echo "ERROR: octane smoke /health 未 200（60s 上限），容器日志:" >&2
+            docker logs octane-smoke 2>&1 | tail -40 >&2
+            docker rm -f octane-smoke >/dev/null 2>&1 || true
             exit 1
           fi
+          docker rm -f octane-smoke >/dev/null 2>&1 || true
 
   # 部署链（saas X10=5110；镜像 saas-identity-platform-fastapi deploy job，tag push 触发）:
   #   docker build & push（latest + tag 双份）→ VPS deploy 脚本拉镜像 + 渲染 nginx vhost

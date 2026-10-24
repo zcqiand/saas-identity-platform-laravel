@@ -7,27 +7,18 @@
 # 端口是家族契约（docs/conventions/multi-repo-family.md §6 saas X10=5110），钉死在
 # CMD 里不走 env 兜底（suite 硬规则 §1：fail-fast，不留静默默认）。
 #
-# 运行形态（REQ-2026-001 人裁 2026-10-25）：laravel/octane ^2.22 + FrankenPHP
-# v1.13.3 静态二进制（免编译扩展；单容器单进程）。octane:start 在 php CLI 下拉起
-# frankenphp worker——worker 的 PHP 运行时与扩展由 frankenphp 静态构建自带
-# （pdo_pgsql 在列），镜像内 php CLI 只承担 composer 安装与 artisan 启动命令；
-# 下方 build 期断言防「静态构建缺扩展」漂到运行时才炸（fastapi 首航同款纪律）。
-FROM php:8.3-cli
+# 运行形态（REQ-2026-001 人裁 2026-10-25；首航指纹修正同日）：laravel/octane ^2.22
+# + FrankenPHP **官方镜像**（非静态二进制——v1.13.3 静态版内嵌 PHP 8.5 与栈钉 8.3
+# drift，且其 php-cli 子命令要求内嵌 ≥8.6，CI 冒烟取证后弃）。镜像 tag 三钉：
+# frankenphp 1.13.3（octane 要求 ≥1.13.0）+ PHP 8.3.36（php2shell 修复版，与家族
+# 部署前置同版）+ bookworm（glibc）。镜像缺 pdo_pgsql 与 pcntl（octane:start 注册
+# 信号用，缺则 SIGINT undefined 崩），build 期 install-php-extensions 补齐。
+FROM dunglas/frankenphp:1.13.3-php8.3.36-bookworm
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq-dev git unzip \
-    && docker-php-ext-install pdo_pgsql \
-    && rm -rf /var/lib/apt/lists/*
+RUN install-php-extensions pdo_pgsql pcntl
 
-# composer（官方 2.x 镜像拷贝，钉大版本）
+# composer（官方 2.x 镜像拷贝，钉大版本；frankenphp 镜像不带）
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-# FrankenPHP 静态二进制（版本钉死，≥ octane 要求 1.13.0；gnu 变体=Debian glibc 基底）
-ADD https://github.com/php/frankenphp/releases/download/v1.13.3/frankenphp-linux-x86_64-gnu /usr/local/bin/frankenphp
-RUN chmod 0755 /usr/local/bin/frankenphp \
-    && frankenphp build-info > /dev/null \
-    && frankenphp php-cli -m | grep -q pdo_pgsql \
-    || { echo "FATAL: frankenphp static build lacks pdo_pgsql"; exit 1; }
 
 WORKDIR /app
 
@@ -45,10 +36,15 @@ COPY routes/ ./routes/
 COPY artisan ./
 RUN php artisan package:discover
 
-# octane 运行期需要（CI git checkout 不带空目录；frankenphp worker 会写 views/cache 状态）
-RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/framework/logs storage/logs
+# octane 运行期需要（CI git checkout 不带空目录；frankenphp worker 会写 views/cache
+# 状态；**storage/framework/octane 必须预建**——octane 写 server-state 前用
+# is_writable(dirname) 探测，目录不存在直接抛 Unable to write to process ID file）
+RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views \
+    storage/framework/logs storage/framework/octane storage/logs
 
 EXPOSE 5110
 # --admin-port 必须显式：octane 推算公式 2019+(port-8000)，端口 5110 会算出负数抛
 # 「Unable to determine admin port」（CI 冒烟 2026-10-25 首航前逮住）。
+# APP_KEY 由 env-file 显式提供（octane worker boot 期解析 encrypter，缺则
+# MissingAppKeyException；deploy 脚本首启随机生成持久化，API 面不消费）。
 CMD ["php", "artisan", "octane:start", "--server=frankenphp", "--host=0.0.0.0", "--port=5110", "--admin-port=2019"]
