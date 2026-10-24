@@ -15,7 +15,9 @@
 # 信号用，缺则 SIGINT undefined 崩），build 期 install-php-extensions 补齐。
 FROM dunglas/frankenphp:1.13.3-php8.3.36-bookworm
 
-RUN install-php-extensions pdo_pgsql pcntl
+RUN install-php-extensions pdo_pgsql pcntl zip
+# zip：composer --prefer-dist 需要（镜像 stripped 后无 zip 扩展也无 unzip/7z，
+# 缺则 ZipDownloader 报 "zip extension and unzip/7z commands are both missing"）
 
 # composer（官方 2.x 镜像拷贝，钉大版本；frankenphp 镜像不带）
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
