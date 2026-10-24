@@ -43,6 +43,11 @@ jobs:
           chmod 0755 /usr/local/bin/frankenphp
           mkdir -p storage/framework/cache/data storage/framework/sessions \
             storage/framework/views storage/framework/logs storage/logs
+          echo "→ frankenphp 内嵌 PHP 扩展清单:"
+          frankenphp php-cli -m | tr '\n' ' ' | fold -w 100
+          echo "→ frankenphp 内嵌 PHP 直接 boot app（worker 同款运行时，错误不被吞）:"
+          frankenphp php-cli artisan route:list --no-ansi 2>&1 | head -3
+          echo "boot exit=$?"
           php artisan octane:start --server=frankenphp --host=127.0.0.1 --port=5110 --admin-port=2019 \
             > octane-smoke.log 2>&1 &
           ok=""
