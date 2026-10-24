@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "project": "saas-identity-platform-laravel",
+  "evidence_at": "2026-10-20T00:19:08+0800",
+  "levels": {
+    "L4": 2
+  },
+  "note": "ADR-0044 红灯证据：red 期测试门失败自动落盘，供 phase.py --to green 核验"
+}
