@@ -17,7 +17,10 @@ use Tests\TestCase;
 final class RouteParityTest extends TestCase
 {
     /** /health 是 contract-test healthcheck 探针，非 OpenAPI 契约面 —— 唯一合法私路由。 */
-    private const EXTRA_ROUTE_ALLOWLIST = ['GET /health'];
+    private const EXTRA_ROUTE_ALLOWLIST = ['GET /health', 'GET //', 'GET /api-docs', 'GET /api-docs/openapi.yaml'];
+    // REQ-2026-002 swagger 文档面三路由：基础设施端点不进契约面（/health 同模式）。
+    // 'GET //' 是根路由（uri=''，测试侧拼 '/' 前缀的产物）——壳页/契约/vendor 静态件
+    // 内容=shared 契约生成物原样，非手写契约面（ktor REQ-2026-003 DocSurfaceTest 同构）。
 
     /** @var list<array{method: string, operationId: string, path: string}> */
     private array $operations = [];
