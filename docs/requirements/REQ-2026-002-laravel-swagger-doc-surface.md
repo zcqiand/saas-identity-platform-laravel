@@ -5,7 +5,7 @@
 | 提出人 | zcqiand |
 | 提出日期 | 2026-10-25 |
 | 优先级 | P1 |
-| 状态 | 规划 |
+| 状态 | 已完成 |
 | 关联 REQ | REQ-2026-003（kotlin 双仓同款先行落地，v0.2.1-20261025 prod 全绿）；REQ-2026-001（deploy 链） |
 
 ## 1. 需求描述
@@ -67,8 +67,8 @@
 | T-2 | saas 仓：gen-shared.sh 落 openapi.yaml + vendor swagger-ui + 路由/壳页 + 测试 + gate 全绿 | 代码 | Claude | — | 已完成 |
 | T-3 | lab 仓镜像同构 + gate 全绿 | 代码 | Claude | — | 已完成 |
 | T-4 | 两仓 CI smoke 补 swagger 文档面探针 | 代码 | Claude | — | 已完成 |
-| T-5 | 首航：tag push（外发动作，逐项确认）→ prod 探活（AC-5） | 验证 | Claude | — | 待开始 |
-| T-6 | 收账：家族档案（如需）、记忆指纹、suite gitlink | 文档 | Claude | — | 待开始 |
+| T-5 | 首航：tag push（外发动作，逐项确认）→ prod 探活（AC-5）。v0.2.0/0.2.1 两轮首航红修正（澄清 #6/#7 + 镜像 resources/ 漏拷），v0.2.2-20261025 全绿：双域 302+200×3+health，hash 链 prod=repo=shared（f73b6f77…/d8485767…） | 验证 | Claude | — | 已完成 |
+| T-6 | 收账：家族档案（如需）、记忆指纹、suite gitlink | 文档 | Claude | — | 已完成 |
 
 ## 4. 功能影响（需求与功能对齐的唯一位置）
 
