@@ -13,6 +13,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +31,26 @@ return Application::configure(basePath: dirname(__DIR__))
             // 经 then: 注册、不挂 web 中间件组——探活是基础设施，不走 session/cookie，无 APP_KEY 依赖。
             // /health 不进契约面；业务 API 一律走 routes/api.php（suite-hard-rules §4）。
             Route::get('/health', fn (): JsonResponse => response()->json(['ok' => true, 'mode' => 'laravel']));
+
+            // Swagger 文档面（REQ-2026-002，ktor REQ-2026-003 镜像）：/ 302 → 壳页 →
+            // shared 契约生成物（public/api-docs.yaml，gen-shared.sh 落盘——文件非目录，
+            // 防遮蔽 /api-docs 路由）+ public/swagger-ui/5.34.0/ pinned 静态件（vendor
+            // 入库，npmmirror 钉版下载），零手写注解零漂移。与 /health 同模式经 then:
+            // 注册、不挂 web 组：web 组 StartSession 走 database driver，无 DB 面一律
+            // 500（v0.2.0 首航红指纹：CI smoke 占位 env 连不上库/本地无 sessions 表，
+            // 表现为 /health 200 而 /api-docs 500）——文档面是基础设施端点，不依赖
+            // session/DB。不进契约面/功能树（与 /health 同模式）。
+            // bump swagger-ui-dist 时同 commit 换 public/swagger-ui/<ver>/ 并改本注释、
+            // resources/views/docs/swagger.blade.php、ci.yml 探针三处版本引用。
+            Route::get('/', fn (): RedirectResponse => redirect('/api-docs'));
+            Route::view('/api-docs', 'docs.swagger');
+            Route::get('/api-docs/openapi.yaml', function (): Response {
+                // shared 契约生成物原样透传（gen-shared.sh 落盘），禁手编——漂移在 regen 即同步
+                $path = public_path('api-docs.yaml');
+                abort_unless(is_file($path), 404);
+
+                return response(file_get_contents($path), Response::HTTP_OK, ['Content-Type' => 'application/yaml']);
+            });
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
