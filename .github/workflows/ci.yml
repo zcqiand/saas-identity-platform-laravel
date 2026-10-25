@@ -69,6 +69,12 @@ jobs:
           echo "→ /api-docs/openapi.yaml=$docs /api-docs=$shell /swagger-ui/5.34.0/swagger-ui.css=$ui"
           if [ "$docs" != "200" ] || [ "$shell" != "200" ] || [ "$ui" != "200" ]; then
             echo "ERROR: swagger 文档面探针非 200，容器日志:" >&2
+            echo "→ /api-docs body:" >&2
+            curl -sS --max-time 3 http://127.0.0.1:5110/api-docs 2>&1 | head -c 800 >&2 || true
+            echo >&2
+            echo "→ /api-docs/openapi.yaml body:" >&2
+            curl -sS --max-time 3 http://127.0.0.1:5110/api-docs/openapi.yaml 2>&1 | head -c 300 >&2 || true
+            echo >&2
             docker logs octane-smoke 2>&1 | tail -40 >&2
             docker rm -f octane-smoke >/dev/null 2>&1 || true
             exit 1

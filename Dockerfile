@@ -34,6 +34,10 @@ COPY bootstrap/ ./bootstrap/
 COPY config/ ./config/
 COPY public/ ./public/
 COPY routes/ ./routes/
+# resources/ 必须进镜像：blade 壳页视图 resources/views/docs/swagger.blade.php
+# （REQ-2026-002）。漏拷 = Route::view 渲染炸（v0.2.1 首航指纹：/api-docs 400，
+# yaml/静态件/health 均不触视图所以 200 掩盖）。
+COPY resources/ ./resources/
 COPY artisan ./
 RUN php artisan package:discover
 
