@@ -7,11 +7,12 @@ SaaS 身份平台 Laravel 端（`saas-identity-platform-laravel`）——一句�
 ## 快速开始
 
 ```bash
-# 按 laravel 栈替换为实际命令
-npm install        # 安装依赖
-npm test           # 全量测试（无 Key / 无 Docker / 无网可跑）
-npm run dev        # 本地开发
-npm run build      # 生产构建
+# 前置：php 8.3+ 与 composer
+composer install                                     # 安装依赖（composer.lock 钉版）
+php vendor/laravel/pint/builds/pint --test           # L1 格式
+php vendor/phpstan/phpstan/phpstan analyse --memory-limit=1G   # L2 静态（larastan）
+php vendor/phpunit/phpunit/phpunit                   # L4 测试
+php artisan octane:start --host=127.0.0.1 --port=5110   # 本地起服务（octane，.env SERVER_PORT=5110）
 ```
 
 ## 功能特性
@@ -22,7 +23,7 @@ npm run build      # 生产构建
 
 | 技术 | 版本 |
 | :--- | :--- |
-| __STACK_DESC_LINE__ | |
+| PHP / Laravel | ^8.3 / ^12.0（composer.lock 钉版，octane 承载） |
 
 > 依赖版本与 `version-lock.json` 的 `version_lock` 一致，不引入 lock 外的库。
 
