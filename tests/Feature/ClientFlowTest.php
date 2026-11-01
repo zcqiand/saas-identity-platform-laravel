@@ -303,6 +303,50 @@ final class ClientFlowTest extends TestCase
         self::assertSame('BAD_REQUEST', $response->json('code'));
     }
 
+    // 5.121 家族裁定：菜单列表确定性——sortOrder 主键 + id 次级键。
+    // 乱序插入钉主键；8 条并列 sortOrder 钉次级键（修前 orderBy('sort_order') 单键下
+    // 并列行序由 PG heap 决定，插入序 == id 升序概率 1/8!，红是确定的）。
+    // list 与 reorder 响应同走 orderBy('sort_order')，两面同钉——上方 2026-10-21 的
+    // 「确定性面」断言是修前过渡钉，本测是修后全序钉。
+    #[Test]
+    public function client_menus_order_by_sort_order_then_id(): void
+    {
+        $clientId = $this->makeClient('tf-menu-ordering');
+        $late = $this->makeMenu($clientId, 'ORD-LATE', sortOrder: 1);
+        $early = $this->makeMenu($clientId, 'ORD-EARLY', sortOrder: 2);
+        $tied = [];
+        for ($i = 0; $i < 8; $i++) {
+            $tied[] = $this->makeMenu($clientId, "ORD-T{$i}", sortOrder: 5);
+        }
+        $sortedTied = $tied;
+        sort($sortedTied);
+
+        $list = $this->getJson("/api/v1/clients/{$clientId}/menus", $this->authHeader($this->token));
+        self::assertSame(200, $list->status(), $list->getContent());
+        $ids = array_column($list->json(), 'id');
+
+        // 主键：sortOrder 升序（1 在 2 前）
+        self::assertLessThan(
+            array_search($early, $ids, true),
+            array_search($late, $ids, true),
+            'sortOrder=1 应排在 2 前'
+        );
+        // 次级键：响应中并列组子序列（保持响应序）== id 升序
+        $respTied = array_values(array_filter($ids, fn (string $id): bool => in_array($id, $tied, true)));
+        self::assertSame($sortedTied, $respTied, '并列组应按 id 升序');
+
+        // reorder 响应同面：并列组子序列仍 id 升序
+        $reorder = $this->putJson(
+            "/api/v1/clients/{$clientId}/menus/{$late}/reorder",
+            ['orderedMenuIds' => [$late]],
+            $this->authHeader($this->token)
+        );
+        self::assertSame(200, $reorder->status(), $reorder->getContent());
+        $reorderIds = array_column($reorder->json(), 'id');
+        $respTied = array_values(array_filter($reorderIds, fn (string $id): bool => in_array($id, $tied, true)));
+        self::assertSame($sortedTied, $respTied, 'reorder 响应并列组应按 id 升序');
+    }
+
     // rails delete_sys_menu 镜像：deleteById 语义不预查，恒 204（未知 uuid 也 204）
     #[Test]
     public function delete_sys_menu_is_204_even_for_unknown(): void

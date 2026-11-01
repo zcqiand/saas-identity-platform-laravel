@@ -24,7 +24,7 @@ final class ClientMenusController extends Controller
     {
         $menus = SysMenu::query()
             ->where('client_id', (string) $request->route('clientId'))
-            ->orderBy('sort_order')
+            ->orderBy('sort_order')->orderBy('id')
             ->get();
 
         return $this->renderCamel($menus->map(fn (SysMenu $menu): array => $this->menuDto($menu))->all());
@@ -125,7 +125,7 @@ final class ClientMenusController extends Controller
 
         $menus = SysMenu::query()
             ->where('client_id', (string) $request->route('clientId'))
-            ->orderBy('sort_order')
+            ->orderBy('sort_order')->orderBy('id')
             ->get();
 
         return $this->renderCamel($menus->map(fn (SysMenu $row): array => $this->menuDto($row))->all());
