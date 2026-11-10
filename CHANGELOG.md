@@ -12,3 +12,7 @@
 - `v0.1.3-20261025`（2026-10-25）— fix(docker): COPY database/ 删行——DB-First 无 migrations，目录 git 内不存在致 build checksum 失败
 - `v0.1.2-20261025`（2026-10-25）— fix(deploy): 首航指纹修正——frankenphp 官方镜像替静态二进制 + APP_KEY 进 env 契约
 - `v0.1.1-20261025`（2026-10-25）— fix(deploy): octane:start 显式 --admin-port=2019——端口 5110 触发 admin 端口推算负数
+
+## [Unreleased]
+
+- chore(rename): 系统显示名统一（suite 全家族批）——「实验室管理系统」→「建筑工程实验室管理系统」；「身份平台」名称位（标题/品牌/包描述/UI 标签）→「SaaS 多租户多应用身份平台」，行文短称保留。同批兄弟仓同节奏提交。
